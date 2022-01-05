@@ -12,6 +12,7 @@
 #include <pthread.h>
 #include <sys/types.h>
 #include <signal.h>
+#include <string.h>
 
 //kazdy klient bude mat svoju jedinecnu strukturu, akoby taka databaza klientov s ich kartami a zetonami, server k nim ma pristup
 typedef struct {
@@ -23,6 +24,9 @@ typedef struct {
     int druhakarta;
     int pocetZetonov;
     int klientovaStavka;
+    int celkovaStavka;
+    int* potrebnaStavka;
+    int meniliSme;
     //pthread_mutex_t* mutex;
     //pthread_cond_t *cakamenaKlienta;
 } client_t;
@@ -33,6 +37,7 @@ typedef struct {
     int bigBlind;
     int smallBlind;
     int celkovaStavka;
+    int* potrebnaStavka;
     //pthread_mutex_t* mutex;
     //pthread_cond_t *cakamenaKlienta;
 } dataHry;
@@ -144,6 +149,39 @@ void send_messageToAll(char *s){
     //pthread_mutex_unlock(&clients_mutex);
 }
 
+//zo spravy klienta zistim, ci checkol alebo navysil alebo zlozil
+void klientovaAkcia(char buff_out[2048], client_t* cli) {
+    int cislo = (int)strtol(buff_out, NULL, 10);
+    printf("Cislo je %d\n", cislo);
+    printf("Buffer je je %s\n", buff_out);
+    //char str[2048] = strstr(buff_out, " ");
+    if (cislo == 0) {
+        if (*cli->potrebnaStavka - cli->klientovaStavka == 0) {
+            sprintf(buff_out, "Hrac %s checkuje\n", cli->name);
+            send_messageToAll(buff_out);
+        } else {
+            sprintf(buff_out, "Hrac %s dorovnava\n", cli->name);
+            send_messageToAll(buff_out);
+            cli->pocetZetonov -= *cli->potrebnaStavka - cli->klientovaStavka;
+            cli->klientovaStavka = *cli->potrebnaStavka;
+        }
+    } else {
+        if (cislo > 0) {
+            cli->klientovaStavka += cislo;
+            cli->celkovaStavka += cislo;
+            *cli->potrebnaStavka = cli->klientovaStavka;
+            cli->meniliSme = 1;
+            cli->pocetZetonov -= cislo;
+            sprintf(buff_out, "Hrac %s navysil stavku o %d\n", cli->name, cislo);
+            send_messageToAll(buff_out);
+        } else {
+            cli->meniliSme = 2;
+            sprintf(buff_out, "Hrac %s zlozil karty o %d\n", cli->name, cislo);
+            send_messageToAll(buff_out);
+        }
+    }
+}
+
 //vlakno na manipulaciu s klientami, pre kazdeho klienta sa vytvori vlakno
 void * handle_client(void * data) {
     char buff_out[2048];
@@ -184,6 +222,7 @@ void * handle_client(void * data) {
                 send_message(buff_out, cli->uid);                          //posleme vsetkym klientom spravu, normalka
                 str_trim_lf(buff_out, strlen(buff_out));
                 printf("%s -> %s\n", buff_out, cli->name);          //posleme spravu, ktoru poslal dany klient
+                klientovaAkcia(buff_out, cli);
                 pthread_cond_signal(&cakameNaKlienta);
             }
             //ak nic nedostaneme, konec
@@ -216,7 +255,7 @@ void * hlavny_program(void * data) {
     printf("Cakame na hracov\n");
     char buff_out[2048];
     dataHry *dataH = (dataHry *)data;
-    usleep(20000000);
+    usleep(30000000);
 
     //ak je ich malo koncime, ak je ich dost, ideme hrat
     if (cli_count <= 1) {
@@ -231,7 +270,7 @@ void * hlavny_program(void * data) {
             int mameStavene = 0;
             //blindy
             //pthread_mutex_lock(&clients_mutex);
-            printf("Dosli sme sem\n");
+            printf("ZACINAME NOVE KOLO\n");
             for (int i = 0; i < cli_count; ++i) {
                 if (clients[i]) {
                     if (dataH->bigBlind == i) {
@@ -240,6 +279,8 @@ void * hlavny_program(void * data) {
                         dataH->celkovaStavka += 40;
                         sprintf(buff_out, "Vkladate big blind 40, vas pocet zetonov je %d\n", clients[i]->pocetZetonov);
                         send_messageToConcrete(buff_out, clients[i]->uid);
+                        sprintf(buff_out, "Hrac %s vklada big blind 40\n", clients[i]->name);
+                        send_message(buff_out, clients[i]->uid);
                     }
                     if (dataH->smallBlind == i) {
                         clients[i]->pocetZetonov -= 20;
@@ -247,32 +288,49 @@ void * hlavny_program(void * data) {
                         dataH->celkovaStavka += 20;
                         sprintf(buff_out, "Vkladate small blind 20, vas pocet zetonov je %d\n", clients[i]->pocetZetonov);
                         send_messageToConcrete(buff_out, clients[i]->uid);
+                        sprintf(buff_out, "Hrac %s vklada small blind 20\n", clients[i]->name);
+                        send_message(buff_out, clients[i]->uid);
                     }
                 } else {
-                    printf("Klient neexustuje");
+                    printf("Klient neexustuje CHYBA");
                 }
             }
+            *dataH->potrebnaStavka = 40;
             //prve stavky bez kariet
-            printf("Dosli sme sem 2\n");
+            printf("PRIJIMAM PRVE STAVKY\n");
             while (mameStavene == 0) {
                 mameStavene = 1;
                 for (int i = 0; i < cli_count; ++i) {
                     if (clients[i]) {
-                        sprintf(buff_out, "Vas pocet zetonov je %d\n Vasa stavka je %d\n Stlac 0 pre check/dorovnanie, ine cislo pre zvysenie stavky\n", clients[i]->pocetZetonov, clients[i]->klientovaStavka);
-                        send_messageToConcrete(buff_out, clients[i]->uid);
-                        pthread_cond_wait(&cakameNaKlienta, &clients_mutex);
+                        if (clients[i]->meniliSme == 0) {
+                            sprintf(buff_out, "Vas pocet zetonov je %d\n Vasa stavka je %d\n Stlac 0 pre check/dorovnanie, ine cislo pre zvysenie stavky\n", clients[i]->pocetZetonov, clients[i]->klientovaStavka);
+                            send_messageToConcrete(buff_out, clients[i]->uid);
+                            pthread_cond_wait(&cakameNaKlienta, &clients_mutex);
+                            if (clients[i]->meniliSme == 1) {
+                                mameStavene = 0;
+                                clients[i]->meniliSme = 0;
+                            }
+                        }
                     } else {
                         printf("Klient neexustuje CHYBA");
                     }
                 }
             }
+            mameStavene = 0;
             dataH->bigBlind += 1;
             dataH->smallBlind += 1;
-            if (dataH->bigBlind == cli_count) {
+            if (dataH->bigBlind >= cli_count) {
                 dataH->bigBlind = 0;
             }
-            if (dataH->smallBlind == cli_count) {
+            if (dataH->smallBlind >= cli_count) {
                 dataH->smallBlind = 0;
+            }
+            dataH->celkovaStavka = 0;
+            *dataH->potrebnaStavka = 0;
+            for (int i = 0; i < cli_count; ++i) {
+                if (clients[i]) {
+                    clients[i]->klientovaStavka = 0;
+                }
             }
             //pthread_mutex_unlock(&clients_mutex);
         }
@@ -286,7 +344,7 @@ int main() {
     //defaultne nastavenia
     srand(time(NULL));
     char* ip = "127.0.0.1";
-    int port = 9002;                 //port, na ktory sa pripajame
+    int port = 9004;                 //port, na ktory sa pripajame
     int uid = 10;
 
     int option = 1;
@@ -334,7 +392,8 @@ int main() {
     int smallBlind = 1;
     int bigBlind = 0;
     int celkovaStavka = 0;
-    dataHry d = {bigBlind, smallBlind, celkovaStavka};
+    int potrebnaStavka = 0;
+    dataHry d = {bigBlind, smallBlind, celkovaStavka, &potrebnaStavka};
     //d->mutex = &clients_mutex;
     //d->cakamenaKlienta = &cakameNaKlienta;
     pthread_create(&hid, NULL, &hlavny_program, &d);
@@ -358,6 +417,9 @@ int main() {
         cli->uid = uid++;
         cli->pocetZetonov = 1000;
         cli->klientovaStavka = 0;
+        cli->celkovaStavka = celkovaStavka;
+        cli->potrebnaStavka = &potrebnaStavka;
+        cli->meniliSme = 0;
         //cli->mutex = &clients_mutex;
         //cli->cakamenaKlienta = &cakameNaKlienta;
 
@@ -368,6 +430,7 @@ int main() {
         usleep(1000);
     }
     pthread_join(hid, NULL);
-    //pthread_cond_destroy(&cakameNaKlienta);
+    pthread_mutex_destroy(&clients_mutex);
+    pthread_cond_destroy(&cakameNaKlienta);
     printf("Skoncili sme\n");
 }

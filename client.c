@@ -51,7 +51,7 @@ void send_msg_handler() {
         if (strcmp(message, "exit") == 0) {
             break;
         } else {
-            sprintf(buffer, "%s: %s\n", name, message);
+            sprintf(buffer, "%s\n", message);
             send(sockFD, buffer, strlen(buffer), 0);
         }
 
@@ -82,7 +82,7 @@ void recv_msg_handler() {
 int main() {
     //defaultne nastavenia
     char* ip = "127.0.0.1";
-    int port = 9002;                 //port, na ktory sa pripajame
+    int port = 9004;                 //port, na ktory sa pripajame
 
     signal(SIGINT, catch_ctrl_c_and_exit);
 
