@@ -21,10 +21,12 @@ typedef struct {
     int uid;                      //id pouzivatela, pre kazdeho dedinecne
     char name[32];                //meno pouzivatela
     int prvaKarta;
-    int druhakarta;
+    int druhaKarta;
+    int prvaFarba;
+    int druhaFarba;
     int pocetZetonov;
     int klientovaStavka;
-    int celkovaStavka;
+    int* celkovaStavka;
     int* potrebnaStavka;
     int meniliSme;
     //pthread_mutex_t* mutex;
@@ -36,8 +38,18 @@ typedef struct {
     //int karty[5];
     int bigBlind;
     int smallBlind;
-    int celkovaStavka;
+    int* celkovaStavka;
     int* potrebnaStavka;
+    int prvaKarta;
+    int druhaKarta;
+    int tretiaKarta;
+    int stvrtaKarta;
+    int piataKarta;
+    int prvaFarba;
+    int druhaFarba;
+    int tretiaFarba;
+    int stvrtaFarba;
+    int piataFarba;
     //pthread_mutex_t* mutex;
     //pthread_cond_t *cakamenaKlienta;
 } dataHry;
@@ -163,12 +175,13 @@ void klientovaAkcia(char buff_out[2048], client_t* cli) {
             sprintf(buff_out, "Hrac %s dorovnava\n", cli->name);
             send_messageToAll(buff_out);
             cli->pocetZetonov -= *cli->potrebnaStavka - cli->klientovaStavka;
+            *cli->celkovaStavka += *cli->potrebnaStavka - cli->klientovaStavka;
             cli->klientovaStavka = *cli->potrebnaStavka;
         }
     } else {
         if (cislo > 0) {
             cli->klientovaStavka += cislo;
-            cli->celkovaStavka += cislo;
+            *cli->celkovaStavka += cislo;
             *cli->potrebnaStavka = cli->klientovaStavka;
             cli->meniliSme = 1;
             cli->pocetZetonov -= cislo;
@@ -271,12 +284,14 @@ void * hlavny_program(void * data) {
             //blindy
             //pthread_mutex_lock(&clients_mutex);
             printf("ZACINAME NOVE KOLO\n");
+            sprintf(buff_out, "ZACINAME NOVE KOLO\n");
+            send_messageToAll(buff_out);
             for (int i = 0; i < cli_count; ++i) {
                 if (clients[i]) {
                     if (dataH->bigBlind == i) {
                         clients[i]->pocetZetonov -= 40;
                         clients[i]->klientovaStavka += 40;
-                        dataH->celkovaStavka += 40;
+                        *dataH->celkovaStavka += 40;
                         sprintf(buff_out, "Vkladate big blind 40, vas pocet zetonov je %d\n", clients[i]->pocetZetonov);
                         send_messageToConcrete(buff_out, clients[i]->uid);
                         sprintf(buff_out, "Hrac %s vklada big blind 40\n", clients[i]->name);
@@ -285,7 +300,7 @@ void * hlavny_program(void * data) {
                     if (dataH->smallBlind == i) {
                         clients[i]->pocetZetonov -= 20;
                         clients[i]->klientovaStavka += 20;
-                        dataH->celkovaStavka += 20;
+                        *dataH->celkovaStavka += 20;
                         sprintf(buff_out, "Vkladate small blind 20, vas pocet zetonov je %d\n", clients[i]->pocetZetonov);
                         send_messageToConcrete(buff_out, clients[i]->uid);
                         sprintf(buff_out, "Hrac %s vklada small blind 20\n", clients[i]->name);
@@ -296,14 +311,33 @@ void * hlavny_program(void * data) {
                 }
             }
             *dataH->potrebnaStavka = 40;
-            //prve stavky bez kariet
+            //prve stavky, zacnem uz rovno s kartami
             printf("PRIJIMAM PRVE STAVKY\n");
+            sprintf(buff_out, "PRIJIMAM PRVE STAVKY\n");
+            send_messageToAll(buff_out);
+            printf("ROZDAVAM PRVE DVE KARTY\n");
+            sprintf(buff_out, "ROZDAVAM PRVE DVE KARTY\n");
+            send_messageToAll(buff_out);
+            //----NEZABUDNUT ZMENIT ABY NEBOLI ROVNAKE-------
+            for (int i = 0; i < cli_count; ++i) {
+                if (clients[i]) {
+                    clients[i]->prvaKarta = (rand() % 14) + 1;
+                    clients[i]->prvaFarba = (rand() % 4) + 1;
+                    clients[i]->druhaKarta = (rand() % 14) + 1;
+                    clients[i]->druhaFarba = (rand() % 4) + 1;
+                    sprintf(buff_out, "Vase karty su %d,f%d a %d,f%d\n", clients[i]->prvaKarta, clients[i]->prvaFarba, clients[i]->druhaKarta, clients[i]->druhaFarba);
+                    send_messageToConcrete(buff_out, clients[i]->uid);
+                } else {
+                    printf("Klient neexustuje CHYBA");
+                }
+            }
+            //prve dve karty
             while (mameStavene == 0) {
                 mameStavene = 1;
                 for (int i = 0; i < cli_count; ++i) {
                     if (clients[i]) {
                         if (clients[i]->meniliSme == 0) {
-                            sprintf(buff_out, "Vas pocet zetonov je %d\n Vasa stavka je %d\n Stlac 0 pre check/dorovnanie, ine cislo pre zvysenie stavky\n", clients[i]->pocetZetonov, clients[i]->klientovaStavka);
+                            sprintf(buff_out, "Vas pocet zetonov je %d\n Potrebna stavka je %d\n Vasa stavka je %d\n Vase karty su %d,f%d a %d,f%d\n Stlac 0 pre check/dorovnanie, kladne cislo pre zvysenie stavky, zaporne pre zlozenie\n", clients[i]->pocetZetonov, *clients[i]->potrebnaStavka, clients[i]->klientovaStavka, clients[i]->prvaKarta, clients[i]->prvaFarba, clients[i]->druhaKarta, clients[i]->druhaFarba);
                             send_messageToConcrete(buff_out, clients[i]->uid);
                             pthread_cond_wait(&cakameNaKlienta, &clients_mutex);
                             if (clients[i]->meniliSme == 1) {
@@ -316,7 +350,95 @@ void * hlavny_program(void * data) {
                     }
                 }
             }
+            //pridavam dalsie tri karty
+            printf("ROZDAVAM TRI SPOLOCNE KARTY\n");
+            sprintf(buff_out, "ROZDAVAM TRI SPOLOCNE KARTY\n");
+            send_messageToAll(buff_out);
+            dataH->prvaKarta = (rand() % 14) + 1;
+            dataH->druhaKarta = (rand() % 14) + 1;
+            dataH->tretiaKarta = (rand() % 14) + 1;
+            dataH->prvaFarba = (rand() % 4) + 1;
+            dataH->druhaFarba = (rand() % 4) + 1;
+            dataH->tretiaFarba  = (rand() % 4) + 1;
+            sprintf(buff_out, "Spolocne karty su %d,f%d a %d,f%d a %d,f%d\n", dataH->prvaKarta, dataH->prvaFarba, dataH->druhaKarta, dataH->druhaFarba, dataH->tretiaKarta, dataH->tretiaFarba);
+            send_messageToAll(buff_out);
+
             mameStavene = 0;
+            while (mameStavene == 0) {
+                mameStavene = 1;
+                for (int i = 0; i < cli_count; ++i) {
+                    if (clients[i]) {
+                        if (clients[i]->meniliSme == 0) {
+                            sprintf(buff_out, "Vas pocet zetonov je %d\n Potrebna stavka je %d\n Vasa stavka je %d\n Vase karty su %d,f%d a %d,f%d\n Spolocne karty su %d,f%d a %d,f%d a %d,f%d\n Stlac 0 pre check/dorovnanie, kladne cislo pre zvysenie stavky, zaporne pre zlozenie\n", clients[i]->pocetZetonov, *clients[i]->potrebnaStavka, clients[i]->klientovaStavka, clients[i]->prvaKarta, clients[i]->prvaFarba, clients[i]->druhaKarta, clients[i]->druhaFarba, dataH->prvaKarta, dataH->prvaFarba, dataH->druhaKarta, dataH->druhaFarba, dataH->tretiaKarta, dataH->tretiaFarba);
+                            send_messageToConcrete(buff_out, clients[i]->uid);
+                            pthread_cond_wait(&cakameNaKlienta, &clients_mutex);
+                            if (clients[i]->meniliSme == 1) {
+                                mameStavene = 0;
+                                clients[i]->meniliSme = 0;
+                            }
+                        }
+                    } else {
+                        printf("Klient neexustuje CHYBA");
+                    }
+                }
+            }
+            //pridavam stvrtu kartu
+            printf("PRIDAVAM STVRTU KARTU\n");
+            sprintf(buff_out, "PRIDAVAM STVRTU KARTU\n");
+            send_messageToAll(buff_out);
+            dataH->stvrtaKarta = (rand() % 14) + 1;
+            dataH->stvrtaFarba = (rand() % 4) + 1;
+            sprintf(buff_out, "Stvrta karta je %d,f%d", dataH->stvrtaKarta, dataH->stvrtaFarba);
+            send_messageToAll(buff_out);
+
+            mameStavene = 0;
+            while (mameStavene == 0) {
+                mameStavene = 1;
+                for (int i = 0; i < cli_count; ++i) {
+                    if (clients[i]) {
+                        if (clients[i]->meniliSme == 0) {
+                            sprintf(buff_out, "Vas pocet zetonov je %d\n Potrebna stavka je %d\n Vasa stavka je %d\n Vase karty su %d,f%d a %d,f%d\n Spolocne karty su %d,f%d a %d,f%d a %d,f%d a %d,f%d\n Stlac 0 pre check/dorovnanie, kladne cislo pre zvysenie stavky, zaporne pre zlozenie\n", clients[i]->pocetZetonov, *clients[i]->potrebnaStavka, clients[i]->klientovaStavka, clients[i]->prvaKarta, clients[i]->prvaFarba, clients[i]->druhaKarta, clients[i]->druhaFarba, dataH->prvaKarta, dataH->prvaFarba, dataH->druhaKarta, dataH->druhaFarba, dataH->tretiaKarta, dataH->tretiaFarba, dataH->stvrtaKarta, dataH->stvrtaFarba);
+                            send_messageToConcrete(buff_out, clients[i]->uid);
+                            pthread_cond_wait(&cakameNaKlienta, &clients_mutex);
+                            if (clients[i]->meniliSme == 1) {
+                                mameStavene = 0;
+                                clients[i]->meniliSme = 0;
+                            }
+                        }
+                    } else {
+                        printf("Klient neexustuje CHYBA");
+                    }
+                }
+            }
+            //pridavam piatu kartu
+            printf("PRIDAVAM PIATU KARTU\n");
+            sprintf(buff_out, "PRIDAVAM PIATU KARTU\n");
+            send_messageToAll(buff_out);
+            dataH->piataKarta = (rand() % 14) + 1;
+            dataH->piataFarba = (rand() % 4) + 1;
+            sprintf(buff_out, "Piata karta je %d,f%d", dataH->piataKarta, dataH->piataFarba);
+            send_messageToAll(buff_out);
+
+            mameStavene = 0;
+            while (mameStavene == 0) {
+                mameStavene = 1;
+                for (int i = 0; i < cli_count; ++i) {
+                    if (clients[i]) {
+                        if (clients[i]->meniliSme == 0) {
+                            sprintf(buff_out, "Vas pocet zetonov je %d\n Potrebna stavka je %d\n Vasa stavka je %d\n Vase karty su %d,f%d a %d,f%d\n Spolocne karty su %d,f%d a %d,f%d a %d,f%d a %d,f%d a %d,f%d\n Stlac 0 pre check/dorovnanie, kladne cislo pre zvysenie stavky, zaporne pre zlozenie\n", clients[i]->pocetZetonov, *clients[i]->potrebnaStavka, clients[i]->klientovaStavka, clients[i]->prvaKarta, clients[i]->prvaFarba, clients[i]->druhaKarta, clients[i]->druhaFarba, dataH->prvaKarta, dataH->prvaFarba, dataH->druhaKarta, dataH->druhaFarba, dataH->tretiaKarta, dataH->tretiaFarba, dataH->stvrtaKarta, dataH->stvrtaFarba, dataH->prvaKarta, dataH->prvaFarba);
+                            send_messageToConcrete(buff_out, clients[i]->uid);
+                            pthread_cond_wait(&cakameNaKlienta, &clients_mutex);
+                            if (clients[i]->meniliSme == 1) {
+                                mameStavene = 0;
+                                clients[i]->meniliSme = 0;
+                            }
+                        }
+                    } else {
+                        printf("Klient neexustuje CHYBA");
+                    }
+                }
+            }
+
             dataH->bigBlind += 1;
             dataH->smallBlind += 1;
             if (dataH->bigBlind >= cli_count) {
@@ -325,16 +447,17 @@ void * hlavny_program(void * data) {
             if (dataH->smallBlind >= cli_count) {
                 dataH->smallBlind = 0;
             }
-            dataH->celkovaStavka = 0;
+            *dataH->celkovaStavka = 0;
             *dataH->potrebnaStavka = 0;
             for (int i = 0; i < cli_count; ++i) {
                 if (clients[i]) {
                     clients[i]->klientovaStavka = 0;
+                    clients[i]->meniliSme = 0;
                 }
             }
             //pthread_mutex_unlock(&clients_mutex);
         }
-        printf("Dosli sme sem 3\n");
+        //printf("Dosli sme sem 3\n");
     }
     koniecHry = 1;
     return NULL;
@@ -393,7 +516,7 @@ int main() {
     int bigBlind = 0;
     int celkovaStavka = 0;
     int potrebnaStavka = 0;
-    dataHry d = {bigBlind, smallBlind, celkovaStavka, &potrebnaStavka};
+    dataHry d = {bigBlind, smallBlind, &celkovaStavka, &potrebnaStavka, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     //d->mutex = &clients_mutex;
     //d->cakamenaKlienta = &cakameNaKlienta;
     pthread_create(&hid, NULL, &hlavny_program, &d);
@@ -417,8 +540,12 @@ int main() {
         cli->uid = uid++;
         cli->pocetZetonov = 1000;
         cli->klientovaStavka = 0;
-        cli->celkovaStavka = celkovaStavka;
+        cli->celkovaStavka = &celkovaStavka;
         cli->potrebnaStavka = &potrebnaStavka;
+        cli->prvaKarta = 0;
+        cli->druhaKarta = 0;
+        cli->prvaFarba = 0;
+        cli->druhaFarba = 0;
         cli->meniliSme = 0;
         //cli->mutex = &clients_mutex;
         //cli->cakamenaKlienta = &cakameNaKlienta;
