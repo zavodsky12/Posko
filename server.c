@@ -29,6 +29,7 @@ typedef struct {
     int* celkovaStavka;
     int* potrebnaStavka;
     int meniliSme;
+    int najvyssia;
     //pthread_mutex_t* mutex;
     //pthread_cond_t *cakamenaKlienta;
 } client_t;
@@ -180,11 +181,11 @@ void klientovaAkcia(char buff_out[2048], client_t* cli) {
         }
     } else {
         if (cislo > 0) {
-            cli->klientovaStavka += cislo;
-            *cli->celkovaStavka += cislo;
+            *cli->celkovaStavka += cislo + (*cli->potrebnaStavka - cli->klientovaStavka);
+            cli->pocetZetonov -= cislo + (*cli->potrebnaStavka - cli->klientovaStavka);
+            cli->klientovaStavka += cislo + (*cli->potrebnaStavka - cli->klientovaStavka);
             *cli->potrebnaStavka = cli->klientovaStavka;
             cli->meniliSme = 1;
-            cli->pocetZetonov -= cislo;
             sprintf(buff_out, "Hrac %s navysil stavku o %d\n", cli->name, cislo);
             send_messageToAll(buff_out);
         } else {
@@ -263,12 +264,497 @@ void * handle_client(void * data) {
     return NULL;
 }
 
+int kontrola(dataHry* data, int cislo, int farba) {
+    int pocetRovnakych = 0;
+    for (int i = 0; i < cli_count; ++i) {
+        if (cislo == clients[i]->prvaKarta) {
+            if (farba == clients[i]->prvaFarba) {
+                pocetRovnakych++;
+            }
+        }
+        if (cislo == clients[i]->druhaKarta) {
+            if (farba == clients[i]->druhaFarba) {
+                pocetRovnakych++;
+            }
+        }
+    }
+    if (cislo == data->prvaKarta) {
+        if (farba == data->prvaFarba) {
+            pocetRovnakych++;
+        }
+    }
+    if (cislo == data->druhaKarta) {
+        if (farba == data->druhaFarba) {
+            pocetRovnakych++;
+        }
+    }
+    if (cislo == data->tretiaKarta) {
+        if (farba == data->tretiaFarba) {
+            pocetRovnakych++;
+        }
+    }
+    if (cislo == data->stvrtaKarta) {
+        if (farba == data->stvrtaFarba) {
+            pocetRovnakych++;
+        }
+    }
+    if (cislo == data->piataKarta) {
+        if (farba == data->prvaFarba) {
+            pocetRovnakych++;
+        }
+    }
+    if (pocetRovnakych > 1) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+int straightFlash(dataHry* data, int cislo) {
+    printf("Dosli sme sem");
+    int karty[7] = {0};
+    int faraby[7] = {0};
+
+    printf("Dosli sme sem");
+    karty[0] = clients[cislo]->prvaKarta;
+    printf("Dosli sme sem");
+    karty[1] = clients[cislo]->druhaKarta;
+    karty[2] = data->prvaKarta;
+    karty[3] = data->druhaKarta;
+    karty[4] = data->tretiaKarta;
+    karty[5] = data->stvrtaKarta;
+    karty[6] = data->piataKarta;
+    printf("Dosli sme sem");
+    faraby[0] = clients[cislo]->prvaFarba;
+    printf("Dosli sme sem");
+    faraby[1] = clients[cislo]->druhaFarba;
+    faraby[2] = data->prvaFarba;
+    faraby[3] = data->druhaFarba;
+    faraby[4] = data->tretiaFarba;
+    faraby[5] = data->stvrtaFarba;
+    faraby[6] = data->piataFarba;
+    printf("Dosli sme sem");
+    int zmena = 1;
+    while (zmena > 0) {
+        zmena = 0;
+        for (int i = 0; i < 7; ++i) {
+            if (karty[i] > karty[i+1]) {
+                int a = karty[i];
+                karty[i] = karty[i+1];
+                karty[i+1] = a;
+                int b = faraby[i];
+                faraby[i] = faraby[i+1];
+                faraby[i+1] = b;
+                zmena++;
+            }
+        }
+    }
+    printf("Dosli sme sem2");
+    int postupka = 0;
+    int posledne = -1;
+    for (int i = 0; i < 7; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            if (faraby[i] == j) {
+                if (posledne + 1 == karty[i]) {
+                    postupka++;
+                } else {
+                    postupka = 0;
+                }
+                if (postupka == 4) {
+                    clients[i]->najvyssia = karty[i];
+                    return 1;
+                }
+                posledne = karty[i];
+            }
+        }
+    }
+    printf("Dosli sme sem3");
+    return 0;
+}
+
+int fourofAKind(dataHry* data, int cislo) {
+    int karty[7];
+    karty[0] = clients[cislo]->prvaKarta;
+    karty[1] = clients[cislo]->druhaKarta;
+    karty[2] = data->prvaKarta;
+    karty[3] = data->druhaKarta;
+    karty[4] = data->tretiaKarta;
+    karty[5] = data->stvrtaKarta;
+    karty[6] = data->piataKarta;
+    int zmena = 1;
+    while (zmena > 0) {
+        zmena = 0;
+        for (int i = 0; i < 7; ++i) {
+            if (karty[i] > karty[i+1]) {
+                int a = karty[i];
+                karty[i] = karty[i+1];
+                karty[i+1] = a;
+                zmena++;
+            }
+        }
+    }
+    int pocetRovnakych = 0;
+    for (int i = 0; i < 7; ++i) {
+        if (karty[i] == karty[i+1]) {
+            pocetRovnakych++;
+        } else {
+            pocetRovnakych = 0;
+        }
+        if (pocetRovnakych == 3) {
+            clients[i]->najvyssia = karty[i];
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int fullHouse(dataHry* data, int cislo) {
+    int karty[7];
+    karty[0] = clients[cislo]->prvaKarta;
+    karty[1] = clients[cislo]->druhaKarta;
+    karty[2] = data->prvaKarta;
+    karty[3] = data->druhaKarta;
+    karty[4] = data->tretiaKarta;
+    karty[5] = data->stvrtaKarta;
+    karty[6] = data->piataKarta;
+    int zmena = 1;
+    while (zmena > 0) {
+        zmena = 0;
+        for (int i = 0; i < 7; ++i) {
+            if (karty[i] > karty[i+1]) {
+                int a = karty[i];
+                karty[i] = karty[i+1];
+                karty[i+1] = a;
+                zmena++;
+            }
+        }
+    }
+    int pocetRovnakych = 0;
+    int cislo1 = 0;
+    for (int i = 0; i < 7; ++i) {
+        if (karty[i] == karty[i+1]) {
+            pocetRovnakych++;
+            cislo1 = karty[i];
+        } else {
+            pocetRovnakych = 0;
+        }
+        if (pocetRovnakych == 2) {
+            clients[i]->najvyssia = karty[i];
+            for (int j = 0; j < 7; ++j) {
+                if (karty[i] == karty[i+1] && cislo1 != karty[i]) {
+                    return 1;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+int flush(dataHry* data, int cislo) {
+    int faraby[7];
+    int karty[7];
+    karty[0] = clients[cislo]->prvaKarta;
+    karty[1] = clients[cislo]->druhaKarta;
+    karty[2] = data->prvaKarta;
+    karty[3] = data->druhaKarta;
+    karty[4] = data->tretiaKarta;
+    karty[5] = data->stvrtaKarta;
+    karty[6] = data->piataKarta;
+    faraby[0] = clients[cislo]->prvaFarba;
+    faraby[1] = clients[cislo]->druhaFarba;
+    faraby[2] = data->prvaFarba;
+    faraby[3] = data->druhaFarba;
+    faraby[4] = data->tretiaFarba;
+    faraby[5] = data->stvrtaFarba;
+    faraby[6] = data->piataFarba;
+    int zmena = 1;
+    while (zmena > 0) {
+        zmena = 0;
+        for (int i = 0; i < 7; ++i) {
+            if (faraby[i] > faraby[i+1]) {
+                int a = faraby[i];
+                faraby[i] = faraby[i+1];
+                faraby[i+1] = a;
+                zmena++;
+            }
+        }
+    }
+    int pocetRovnakych = 0;
+    for (int i = 0; i < 7; ++i) {
+        if (faraby[i] == faraby[i+1]) {
+            pocetRovnakych++;
+        } else {
+            pocetRovnakych = 0;
+        }
+        if (pocetRovnakych == 3) {
+            clients[i]->najvyssia = karty[i];
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int straight(dataHry* data, int cislo) {
+    int karty[7];
+    karty[0] = clients[cislo]->prvaKarta;
+    karty[1] = clients[cislo]->druhaKarta;
+    karty[2] = data->prvaKarta;
+    karty[3] = data->druhaKarta;
+    karty[4] = data->tretiaKarta;
+    karty[5] = data->stvrtaKarta;
+    karty[6] = data->piataKarta;
+    int zmena = 1;
+    while (zmena > 0) {
+        zmena = 0;
+        for (int i = 0; i < 7; ++i) {
+            if (karty[i] > karty[i+1]) {
+                int a = karty[i];
+                karty[i] = karty[i+1];
+                karty[i+1] = a;
+                zmena++;
+            }
+        }
+    }
+    int postupka = 0;
+    for (int i = 0; i < 7; ++i) {
+        if (karty[i] == karty[i+1] + 1) {
+            postupka++;
+        } else {
+            if (karty[i] != karty[i+1]) {
+                postupka = 0;
+            }
+        }
+        if (postupka == 4) {
+            clients[i]->najvyssia = karty[i];
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int threeofAKind(dataHry* data, int cislo) {
+    int karty[7];
+    karty[0] = clients[cislo]->prvaKarta;
+    karty[1] = clients[cislo]->druhaKarta;
+    karty[2] = data->prvaKarta;
+    karty[3] = data->druhaKarta;
+    karty[4] = data->tretiaKarta;
+    karty[5] = data->stvrtaKarta;
+    karty[6] = data->piataKarta;
+    int zmena = 1;
+    while (zmena > 0) {
+        zmena = 0;
+        for (int i = 0; i < 7; ++i) {
+            if (karty[i] > karty[i+1]) {
+                int a = karty[i];
+                karty[i] = karty[i+1];
+                karty[i+1] = a;
+                zmena++;
+            }
+        }
+    }
+    int pocetRovnakych = 0;
+    for (int i = 0; i < 7; ++i) {
+        if (karty[i] == karty[i+1]) {
+            pocetRovnakych++;
+        } else {
+            pocetRovnakych = 0;
+        }
+        if (pocetRovnakych == 2) {
+            clients[i]->najvyssia = karty[i];
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int twoPairs(dataHry* data, int cislo) {
+    int karty[7];
+    karty[0] = clients[cislo]->prvaKarta;
+    karty[1] = clients[cislo]->druhaKarta;
+    karty[2] = data->prvaKarta;
+    karty[3] = data->druhaKarta;
+    karty[4] = data->tretiaKarta;
+    karty[5] = data->stvrtaKarta;
+    karty[6] = data->piataKarta;
+    int zmena = 1;
+    while (zmena > 0) {
+        zmena = 0;
+        for (int i = 0; i < 7; ++i) {
+            if (karty[i] > karty[i+1]) {
+                int a = karty[i];
+                karty[i] = karty[i+1];
+                karty[i+1] = a;
+                zmena++;
+            }
+        }
+    }
+    int cislo1 = 0;
+    for (int i = 0; i < 7; ++i) {
+        if (karty[i] == karty[i+1]) {
+            clients[i]->najvyssia = karty[i];
+            cislo1 = karty[i];
+            for (int j = 0; j < 7; ++j) {
+                if (karty[i] == karty[i + 1] && cislo1 != karty[i]) {
+                    if (clients[i]->najvyssia < karty[i]) {
+                        clients[i]->najvyssia = karty[i];
+                    }
+                    return 1;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+int onePair(dataHry* data, int cislo) {
+    int karty[7];
+    karty[0] = clients[cislo]->prvaKarta;
+    karty[1] = clients[cislo]->druhaKarta;
+    karty[2] = data->prvaKarta;
+    karty[3] = data->druhaKarta;
+    karty[4] = data->tretiaKarta;
+    karty[5] = data->stvrtaKarta;
+    karty[6] = data->piataKarta;
+    int zmena = 1;
+    while (zmena > 0) {
+        zmena = 0;
+        for (int i = 0; i < 7; ++i) {
+            if (karty[i] > karty[i+1]) {
+                int a = karty[i];
+                karty[i] = karty[i+1];
+                karty[i+1] = a;
+                zmena++;
+            }
+        }
+    }
+    for (int i = 0; i < 7; ++i) {
+        if (karty[i] == karty[i+1]) {
+            clients[i]->najvyssia = karty[i];
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void vyhodnotVysledky(dataHry* data) {
+    char buff_out[2048];
+    int body[cli_count];
+    int vitazi[cli_count];
+    int cislo = 0;
+    dataHry *dataH = (dataHry *)data;
+    int pocetVitazov = 0;
+    for (int i = 0; i < cli_count; ++i) {
+        if (clients[i]->meniliSme == 2) {
+            sprintf(buff_out, "Hrac %s zlozil karty\n", clients[i]->name);
+            send_messageToAll(buff_out);
+            body[i] = -1;
+        } else {
+            sprintf(buff_out, "Hrac %s ma karty %d,f%d a %d, %d\n", clients[i]->name, clients[i]->prvaKarta, clients[i]->prvaFarba, clients[i]->druhaKarta, clients[i]->druhaFarba);
+            send_messageToAll(buff_out);
+            printf("Dosli sme sem3\n");
+            cislo = straightFlash(dataH, i);
+            printf("Dosli sme sem4\n");
+            if (cislo == 1) {
+                printf("Dosli sme sem5\n");
+                sprintf(buff_out, "Hrac %s ma cistu postupku\n", clients[i]->name);
+                send_messageToAll(buff_out);
+                body[i] = 8;
+            } else {
+                printf("Disli sme sem5");
+                if ((int)fourofAKind(data, i) == 1) {
+                    sprintf(buff_out, "Hrac %s ma styri rovnake karty\n", clients[i]->name);
+                    send_messageToAll(buff_out);
+                    body[i] = 7;
+                } else {
+                    if ((int)fullHouse(data, i) == 1) {
+                        sprintf(buff_out, "Hrac %s ma full house\n", clients[i]->name);
+                        send_messageToAll(buff_out);
+                        body[i] = 6;
+                    } else {
+                        if ((int)flush(data, i) == 1) {
+                            sprintf(buff_out, "Hrac %s ma flush (5 s rovnakou farbou)\n", clients[i]->name);
+                            send_messageToAll(buff_out);
+                            body[i] = 5;
+                        } else {
+                            if ((int)straight(data, i) == 1) {
+                                sprintf(buff_out, "Hrac %s ma straight (postupku bez farby)\n", clients[i]->name);
+                                send_messageToAll(buff_out);
+                                body[i] = 4;
+                            } else {
+                                if ((int)threeofAKind(data, i) == 1) {
+                                    sprintf(buff_out, "Hrac %s ma tri rovnake\n", clients[i]->name);
+                                    send_messageToAll(buff_out);
+                                    body[i] = 3;
+                                } else {
+                                    if ((int)twoPairs(data, i) == 1) {
+                                        sprintf(buff_out, "Hrac %s ma dva pary\n", clients[i]->name);
+                                        send_messageToAll(buff_out);
+                                        body[i] = 2;
+                                    } else {
+                                        if ((int)onePair(data, i) == 1) {
+                                            sprintf(buff_out, "Hrac %s ma par\n", clients[i]->name);
+                                            send_messageToAll(buff_out);
+                                            body[i] = 1;
+                                        } else {
+                                            body[i] = 0;
+                                            if (clients[i]->prvaKarta > clients[i]->druhaKarta) {
+                                                clients[i]->najvyssia = clients[i]->prvaKarta;
+                                            } else {
+                                                clients[i]->najvyssia = clients[i]->druhaKarta;
+                                            }
+                                            sprintf(buff_out, "Hrac %s ma najvyssiu kartu %d\n", clients[i]->name, clients[i]->najvyssia);
+                                            send_messageToAll(buff_out);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    printf("Dosli sme na koniec");
+    int najvyssie = -1;
+    for (int i = 0; i < cli_count; ++i) {
+        if (body[i] > najvyssie) {
+            najvyssie = body[i];
+            vitazi[0] = i;
+            pocetVitazov = 1;
+        }
+        if (body[i] == najvyssie) {
+            if (clients[body[i]]->najvyssia < clients[i]->najvyssia) {
+                vitazi[0] = i;
+                pocetVitazov = 1;
+            } else {
+                if (clients[body[i]]->najvyssia == clients[i]->najvyssia) {
+                    vitazi[pocetVitazov] = i;
+                    pocetVitazov++;
+                }
+            }
+        }
+    }
+    printf("Dosli sme na koniec2");
+    for (int i = 0; i < pocetVitazov; ++i) {
+        clients[vitazi[i]]->pocetZetonov += (*data->celkovaStavka / pocetVitazov);
+        sprintf(buff_out, "Vyhral hrac %s\n", clients[i]->name);
+        send_messageToAll(buff_out);
+    }
+}
+
 void * hlavny_program(void * data) {
     //budeme cakat pol minuty, kym sa vsetci pripoja
     printf("Cakame na hracov\n");
     char buff_out[2048];
     dataHry *dataH = (dataHry *)data;
     usleep(30000000);
+    int kontrilaOriginality = 1;
+    int pocetHrajucich = 0;
+    int zlozilPosledny = 0;
+    int vitaz = 0;
+    int pocetBodov = 0;
+    int druha = 0;
 
     //ak je ich malo koncime, ak je ich dost, ideme hrat
     if (cli_count <= 1) {
@@ -286,6 +772,7 @@ void * hlavny_program(void * data) {
             printf("ZACINAME NOVE KOLO\n");
             sprintf(buff_out, "ZACINAME NOVE KOLO\n");
             send_messageToAll(buff_out);
+            pocetHrajucich = cli_count;
             for (int i = 0; i < cli_count; ++i) {
                 if (clients[i]) {
                     if (dataH->bigBlind == i) {
@@ -318,31 +805,43 @@ void * hlavny_program(void * data) {
             printf("ROZDAVAM PRVE DVE KARTY\n");
             sprintf(buff_out, "ROZDAVAM PRVE DVE KARTY\n");
             send_messageToAll(buff_out);
-            //----NEZABUDNUT ZMENIT ABY NEBOLI ROVNAKE-------
             for (int i = 0; i < cli_count; ++i) {
-                if (clients[i]) {
-                    clients[i]->prvaKarta = (rand() % 14) + 1;
-                    clients[i]->prvaFarba = (rand() % 4) + 1;
-                    clients[i]->druhaKarta = (rand() % 14) + 1;
-                    clients[i]->druhaFarba = (rand() % 4) + 1;
-                    sprintf(buff_out, "Vase karty su %d,f%d a %d,f%d\n", clients[i]->prvaKarta, clients[i]->prvaFarba, clients[i]->druhaKarta, clients[i]->druhaFarba);
-                    send_messageToConcrete(buff_out, clients[i]->uid);
-                } else {
-                    printf("Klient neexustuje CHYBA");
+                kontrilaOriginality = 1;
+                while (kontrilaOriginality > 0) {
+                    kontrilaOriginality = 0;
+                    if (clients[i]) {
+                        clients[i]->prvaKarta = (rand() % 14) + 1;
+                        clients[i]->prvaFarba = (rand() % 4) + 1;
+                        clients[i]->druhaKarta = (rand() % 14) + 1;
+                        clients[i]->druhaFarba = (rand() % 4) + 1;
+                    } else {
+                        printf("Klient neexustuje CHYBA");
+                    }
+                    kontrilaOriginality += kontrola(dataH, clients[i]->prvaKarta, clients[i]->prvaFarba);
+                    kontrilaOriginality += kontrola(dataH, clients[i]->druhaKarta, clients[i]->druhaFarba);
                 }
+                sprintf(buff_out, "Vase karty su %d,f%d a %d,f%d\n", clients[i]->prvaKarta, clients[i]->prvaFarba, clients[i]->druhaKarta, clients[i]->druhaFarba);
+                send_messageToConcrete(buff_out, clients[i]->uid);
             }
             //prve dve karty
+            if (pocetHrajucich < 2) {
+                mameStavene = 1;
+            }
             while (mameStavene == 0) {
                 mameStavene = 1;
                 for (int i = 0; i < cli_count; ++i) {
                     if (clients[i]) {
                         if (clients[i]->meniliSme == 0) {
-                            sprintf(buff_out, "Vas pocet zetonov je %d\n Potrebna stavka je %d\n Vasa stavka je %d\n Vase karty su %d,f%d a %d,f%d\n Stlac 0 pre check/dorovnanie, kladne cislo pre zvysenie stavky, zaporne pre zlozenie\n", clients[i]->pocetZetonov, *clients[i]->potrebnaStavka, clients[i]->klientovaStavka, clients[i]->prvaKarta, clients[i]->prvaFarba, clients[i]->druhaKarta, clients[i]->druhaFarba);
+                            sprintf(buff_out, "Vas pocet zetonov je %d\n Celkovo je v hre %d\n Potrebna stavka je %d\n Vasa stavka je %d\n Vase karty su %d,f%d a %d,f%d\n Stlac 0 pre check/dorovnanie, kladne cislo pre zvysenie stavky, zaporne pre zlozenie\n", clients[i]->pocetZetonov, *clients[i]->celkovaStavka, *clients[i]->potrebnaStavka, clients[i]->klientovaStavka, clients[i]->prvaKarta, clients[i]->prvaFarba, clients[i]->druhaKarta, clients[i]->druhaFarba);
                             send_messageToConcrete(buff_out, clients[i]->uid);
                             pthread_cond_wait(&cakameNaKlienta, &clients_mutex);
                             if (clients[i]->meniliSme == 1) {
                                 mameStavene = 0;
                                 clients[i]->meniliSme = 0;
+                            }
+                            if (clients[i]->meniliSme == 2) {
+                                pocetHrajucich--;
+                                zlozilPosledny = clients[i]->uid;
                             }
                         }
                     } else {
@@ -354,27 +853,44 @@ void * hlavny_program(void * data) {
             printf("ROZDAVAM TRI SPOLOCNE KARTY\n");
             sprintf(buff_out, "ROZDAVAM TRI SPOLOCNE KARTY\n");
             send_messageToAll(buff_out);
-            dataH->prvaKarta = (rand() % 14) + 1;
-            dataH->druhaKarta = (rand() % 14) + 1;
-            dataH->tretiaKarta = (rand() % 14) + 1;
-            dataH->prvaFarba = (rand() % 4) + 1;
-            dataH->druhaFarba = (rand() % 4) + 1;
-            dataH->tretiaFarba  = (rand() % 4) + 1;
+            kontrilaOriginality = 1;
+            if (pocetHrajucich < 2) {
+                kontrilaOriginality = 0;
+            }
+            while (kontrilaOriginality > 0) {
+                kontrilaOriginality = 0;
+                dataH->prvaKarta = (rand() % 14) + 1;
+                dataH->druhaKarta = (rand() % 14) + 1;
+                dataH->tretiaKarta = (rand() % 14) + 1;
+                dataH->prvaFarba = (rand() % 4) + 1;
+                dataH->druhaFarba = (rand() % 4) + 1;
+                dataH->tretiaFarba = (rand() % 4) + 1;
+                kontrilaOriginality += kontrola(dataH, dataH->prvaKarta, dataH->prvaFarba);
+                kontrilaOriginality += kontrola(dataH, dataH->druhaKarta, dataH->druhaFarba);
+                kontrilaOriginality += kontrola(dataH, dataH->tretiaKarta, dataH->tretiaFarba);
+            }
             sprintf(buff_out, "Spolocne karty su %d,f%d a %d,f%d a %d,f%d\n", dataH->prvaKarta, dataH->prvaFarba, dataH->druhaKarta, dataH->druhaFarba, dataH->tretiaKarta, dataH->tretiaFarba);
             send_messageToAll(buff_out);
 
             mameStavene = 0;
+            if (pocetHrajucich < 2) {
+                mameStavene = 1;
+            }
             while (mameStavene == 0) {
                 mameStavene = 1;
                 for (int i = 0; i < cli_count; ++i) {
                     if (clients[i]) {
                         if (clients[i]->meniliSme == 0) {
-                            sprintf(buff_out, "Vas pocet zetonov je %d\n Potrebna stavka je %d\n Vasa stavka je %d\n Vase karty su %d,f%d a %d,f%d\n Spolocne karty su %d,f%d a %d,f%d a %d,f%d\n Stlac 0 pre check/dorovnanie, kladne cislo pre zvysenie stavky, zaporne pre zlozenie\n", clients[i]->pocetZetonov, *clients[i]->potrebnaStavka, clients[i]->klientovaStavka, clients[i]->prvaKarta, clients[i]->prvaFarba, clients[i]->druhaKarta, clients[i]->druhaFarba, dataH->prvaKarta, dataH->prvaFarba, dataH->druhaKarta, dataH->druhaFarba, dataH->tretiaKarta, dataH->tretiaFarba);
+                            sprintf(buff_out, "Vas pocet zetonov je %d\n Celkovo je v hre %d\n Potrebna stavka je %d\n Vasa stavka je %d\n Vase karty su %d,f%d a %d,f%d\n Spolocne karty su %d,f%d a %d,f%d a %d,f%d\n Stlac 0 pre check/dorovnanie, kladne cislo pre zvysenie stavky, zaporne pre zlozenie\n", clients[i]->pocetZetonov, *clients[i]->celkovaStavka, *clients[i]->potrebnaStavka, clients[i]->klientovaStavka, clients[i]->prvaKarta, clients[i]->prvaFarba, clients[i]->druhaKarta, clients[i]->druhaFarba, dataH->prvaKarta, dataH->prvaFarba, dataH->druhaKarta, dataH->druhaFarba, dataH->tretiaKarta, dataH->tretiaFarba);
                             send_messageToConcrete(buff_out, clients[i]->uid);
                             pthread_cond_wait(&cakameNaKlienta, &clients_mutex);
                             if (clients[i]->meniliSme == 1) {
                                 mameStavene = 0;
                                 clients[i]->meniliSme = 0;
+                            }
+                            if (clients[i]->meniliSme == 2) {
+                                pocetHrajucich--;
+                                zlozilPosledny = clients[i]->uid;
                             }
                         }
                     } else {
@@ -386,23 +902,38 @@ void * hlavny_program(void * data) {
             printf("PRIDAVAM STVRTU KARTU\n");
             sprintf(buff_out, "PRIDAVAM STVRTU KARTU\n");
             send_messageToAll(buff_out);
-            dataH->stvrtaKarta = (rand() % 14) + 1;
-            dataH->stvrtaFarba = (rand() % 4) + 1;
+            kontrilaOriginality = 1;
+            if (pocetHrajucich < 2) {
+                kontrilaOriginality = 0;
+            }
+            while (kontrilaOriginality > 0) {
+                kontrilaOriginality = 0;
+                dataH->stvrtaKarta = (rand() % 14) + 1;
+                dataH->stvrtaFarba = (rand() % 4) + 1;
+                kontrilaOriginality += kontrola(dataH, dataH->stvrtaKarta, dataH->stvrtaFarba);
+            }
             sprintf(buff_out, "Stvrta karta je %d,f%d", dataH->stvrtaKarta, dataH->stvrtaFarba);
             send_messageToAll(buff_out);
 
             mameStavene = 0;
+            if (pocetHrajucich < 2) {
+                mameStavene = 1;
+            }
             while (mameStavene == 0) {
                 mameStavene = 1;
                 for (int i = 0; i < cli_count; ++i) {
                     if (clients[i]) {
                         if (clients[i]->meniliSme == 0) {
-                            sprintf(buff_out, "Vas pocet zetonov je %d\n Potrebna stavka je %d\n Vasa stavka je %d\n Vase karty su %d,f%d a %d,f%d\n Spolocne karty su %d,f%d a %d,f%d a %d,f%d a %d,f%d\n Stlac 0 pre check/dorovnanie, kladne cislo pre zvysenie stavky, zaporne pre zlozenie\n", clients[i]->pocetZetonov, *clients[i]->potrebnaStavka, clients[i]->klientovaStavka, clients[i]->prvaKarta, clients[i]->prvaFarba, clients[i]->druhaKarta, clients[i]->druhaFarba, dataH->prvaKarta, dataH->prvaFarba, dataH->druhaKarta, dataH->druhaFarba, dataH->tretiaKarta, dataH->tretiaFarba, dataH->stvrtaKarta, dataH->stvrtaFarba);
+                            sprintf(buff_out, "Vas pocet zetonov je %d\n Celkovo je v hre %d\n Potrebna stavka je %d\n Vasa stavka je %d\n Vase karty su %d,f%d a %d,f%d\n Spolocne karty su %d,f%d a %d,f%d a %d,f%d a %d,f%d\n Stlac 0 pre check/dorovnanie, kladne cislo pre zvysenie stavky, zaporne pre zlozenie\n", clients[i]->pocetZetonov, *clients[i]->celkovaStavka, *clients[i]->potrebnaStavka, clients[i]->klientovaStavka, clients[i]->prvaKarta, clients[i]->prvaFarba, clients[i]->druhaKarta, clients[i]->druhaFarba, dataH->prvaKarta, dataH->prvaFarba, dataH->druhaKarta, dataH->druhaFarba, dataH->tretiaKarta, dataH->tretiaFarba, dataH->stvrtaKarta, dataH->stvrtaFarba);
                             send_messageToConcrete(buff_out, clients[i]->uid);
                             pthread_cond_wait(&cakameNaKlienta, &clients_mutex);
                             if (clients[i]->meniliSme == 1) {
                                 mameStavene = 0;
                                 clients[i]->meniliSme = 0;
+                            }
+                            if (clients[i]->meniliSme == 2) {
+                                pocetHrajucich--;
+                                zlozilPosledny = clients[i]->uid;
                             }
                         }
                     } else {
@@ -414,29 +945,72 @@ void * hlavny_program(void * data) {
             printf("PRIDAVAM PIATU KARTU\n");
             sprintf(buff_out, "PRIDAVAM PIATU KARTU\n");
             send_messageToAll(buff_out);
-            dataH->piataKarta = (rand() % 14) + 1;
-            dataH->piataFarba = (rand() % 4) + 1;
+            kontrilaOriginality = 1;
+            if (pocetHrajucich < 2) {
+                kontrilaOriginality = 0;
+            }
+            while (kontrilaOriginality > 0) {
+                kontrilaOriginality = 0;
+                dataH->piataKarta = (rand() % 14) + 1;
+                dataH->piataFarba = (rand() % 4) + 1;
+                kontrilaOriginality += kontrola(dataH, dataH->piataKarta, dataH->piataFarba);
+            }
             sprintf(buff_out, "Piata karta je %d,f%d", dataH->piataKarta, dataH->piataFarba);
             send_messageToAll(buff_out);
 
             mameStavene = 0;
+            if (pocetHrajucich < 2) {
+                mameStavene = 1;
+            }
             while (mameStavene == 0) {
                 mameStavene = 1;
                 for (int i = 0; i < cli_count; ++i) {
                     if (clients[i]) {
                         if (clients[i]->meniliSme == 0) {
-                            sprintf(buff_out, "Vas pocet zetonov je %d\n Potrebna stavka je %d\n Vasa stavka je %d\n Vase karty su %d,f%d a %d,f%d\n Spolocne karty su %d,f%d a %d,f%d a %d,f%d a %d,f%d a %d,f%d\n Stlac 0 pre check/dorovnanie, kladne cislo pre zvysenie stavky, zaporne pre zlozenie\n", clients[i]->pocetZetonov, *clients[i]->potrebnaStavka, clients[i]->klientovaStavka, clients[i]->prvaKarta, clients[i]->prvaFarba, clients[i]->druhaKarta, clients[i]->druhaFarba, dataH->prvaKarta, dataH->prvaFarba, dataH->druhaKarta, dataH->druhaFarba, dataH->tretiaKarta, dataH->tretiaFarba, dataH->stvrtaKarta, dataH->stvrtaFarba, dataH->prvaKarta, dataH->prvaFarba);
+                            sprintf(buff_out, "Vas pocet zetonov je %d\n Celkovo je v hre %d\n Potrebna stavka je %d\n Vasa stavka je %d\n Vase karty su %d,f%d a %d,f%d\n Spolocne karty su %d,f%d a %d,f%d a %d,f%d a %d,f%d a %d,f%d\n Stlac 0 pre check/dorovnanie, kladne cislo pre zvysenie stavky, zaporne pre zlozenie\n", clients[i]->pocetZetonov, *clients[i]->celkovaStavka, *clients[i]->potrebnaStavka, clients[i]->klientovaStavka, clients[i]->prvaKarta, clients[i]->prvaFarba, clients[i]->druhaKarta, clients[i]->druhaFarba, dataH->prvaKarta, dataH->prvaFarba, dataH->druhaKarta, dataH->druhaFarba, dataH->tretiaKarta, dataH->tretiaFarba, dataH->stvrtaKarta, dataH->stvrtaFarba, dataH->prvaKarta, dataH->prvaFarba);
                             send_messageToConcrete(buff_out, clients[i]->uid);
                             pthread_cond_wait(&cakameNaKlienta, &clients_mutex);
                             if (clients[i]->meniliSme == 1) {
                                 mameStavene = 0;
                                 clients[i]->meniliSme = 0;
                             }
+                            if (clients[i]->meniliSme == 2) {
+                                pocetHrajucich--;
+                                zlozilPosledny = clients[i]->uid;
+                            }
                         }
                     } else {
                         printf("Klient neexustuje CHYBA");
                     }
                 }
+            }
+            //spocitame body a urcime vitaza kola
+            sprintf(buff_out, " \n");
+            send_messageToAll(buff_out);
+            sprintf(buff_out, "VYHODNOTENIE VYSLEDKOV\n");
+            send_messageToAll(buff_out);
+            if (pocetHrajucich == 1) {
+                for (int i = 0; i < cli_count; ++i) {
+                    if (clients[i]->meniliSme == 0) {
+                        sprintf(buff_out, "VITAZOM KOLA JE %s\n", clients[i]->name);
+                        send_messageToAll(buff_out);
+                        clients[i]->pocetZetonov += *dataH->celkovaStavka;
+                        break;
+                    }
+                }
+            }
+            if (pocetHrajucich == 0) {
+                for (int i = 0; i < cli_count; ++i) {
+                    if (clients[i]->uid == zlozilPosledny) {
+                        sprintf(buff_out, "VITAZOM KOLA JE %s\n", clients[i]->name);
+                        send_messageToAll(buff_out);
+                        clients[i]->pocetZetonov += *dataH->celkovaStavka;
+                        break;
+                    }
+                }
+            }
+            if (pocetHrajucich > 1) {
+                vyhodnotVysledky(dataH);
             }
 
             dataH->bigBlind += 1;
@@ -453,8 +1027,20 @@ void * hlavny_program(void * data) {
                 if (clients[i]) {
                     clients[i]->klientovaStavka = 0;
                     clients[i]->meniliSme = 0;
+                    clients[i]->prvaKarta = 0;
+                    clients[i]->druhaKarta = 0;
                 }
             }
+            dataH->prvaKarta = 0;
+            dataH->druhaKarta = 0;
+            dataH->tretiaKarta = 0;
+            dataH->stvrtaKarta = 0;
+            dataH->piataKarta = 0;
+
+            zlozilPosledny = 0;
+            vitaz = 0;
+            druha = 0;
+            pocetBodov = 0;
             //pthread_mutex_unlock(&clients_mutex);
         }
         //printf("Dosli sme sem 3\n");
@@ -547,6 +1133,7 @@ int main() {
         cli->prvaFarba = 0;
         cli->druhaFarba = 0;
         cli->meniliSme = 0;
+        cli->najvyssia = 0;
         //cli->mutex = &clients_mutex;
         //cli->cakamenaKlienta = &cakameNaKlienta;
 
