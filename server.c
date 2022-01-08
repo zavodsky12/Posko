@@ -61,6 +61,8 @@ pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cakameNaKlienta = PTHREAD_COND_INITIALIZER;
 int cli_count = 0;
 int koniecHry = 0;
+int karty[7];
+int faraby[7] = {0};
 
 void str_overwrite_stdout() {
     printf("\r%s", "> ");
@@ -312,8 +314,6 @@ int kontrola(dataHry* data, int cislo, int farba) {
 
 int straightFlash(dataHry* data, int cislo) {
     printf("Dosli sme sem");
-    int karty[7] = {0};
-    int faraby[7] = {0};
 
     printf("Dosli sme sem");
     karty[0] = clients[cislo]->prvaKarta;
@@ -337,7 +337,7 @@ int straightFlash(dataHry* data, int cislo) {
     int zmena = 1;
     while (zmena > 0) {
         zmena = 0;
-        for (int i = 0; i < 7; ++i) {
+        for (int i = 0; i < 6; ++i) {
             if (karty[i] > karty[i+1]) {
                 int a = karty[i];
                 karty[i] = karty[i+1];
@@ -352,8 +352,8 @@ int straightFlash(dataHry* data, int cislo) {
     printf("Dosli sme sem2");
     int postupka = 0;
     int posledne = -1;
-    for (int i = 0; i < 7; ++i) {
-        for (int j = 0; j < 4; ++j) {
+    for (int i = 0; i < 6; ++i) {
+        for (int j = 0; j < 3; ++j) {
             if (faraby[i] == j) {
                 if (posledne + 1 == karty[i]) {
                     postupka++;
@@ -361,7 +361,7 @@ int straightFlash(dataHry* data, int cislo) {
                     postupka = 0;
                 }
                 if (postupka == 4) {
-                    clients[i]->najvyssia = karty[i];
+                    //clients[i]->najvyssia = karty[i];
                     return 1;
                 }
                 posledne = karty[i];
@@ -373,7 +373,7 @@ int straightFlash(dataHry* data, int cislo) {
 }
 
 int fourofAKind(dataHry* data, int cislo) {
-    int karty[7];
+    //int karty[7];
     karty[0] = clients[cislo]->prvaKarta;
     karty[1] = clients[cislo]->druhaKarta;
     karty[2] = data->prvaKarta;
@@ -384,7 +384,7 @@ int fourofAKind(dataHry* data, int cislo) {
     int zmena = 1;
     while (zmena > 0) {
         zmena = 0;
-        for (int i = 0; i < 7; ++i) {
+        for (int i = 0; i < 6; ++i) {
             if (karty[i] > karty[i+1]) {
                 int a = karty[i];
                 karty[i] = karty[i+1];
@@ -394,14 +394,14 @@ int fourofAKind(dataHry* data, int cislo) {
         }
     }
     int pocetRovnakych = 0;
-    for (int i = 0; i < 7; ++i) {
+    for (int i = 0; i < 6; ++i) {
         if (karty[i] == karty[i+1]) {
             pocetRovnakych++;
         } else {
             pocetRovnakych = 0;
         }
         if (pocetRovnakych == 3) {
-            clients[i]->najvyssia = karty[i];
+            //clients[i]->najvyssia = karty[i];
             return 1;
         }
     }
@@ -409,7 +409,7 @@ int fourofAKind(dataHry* data, int cislo) {
 }
 
 int fullHouse(dataHry* data, int cislo) {
-    int karty[7];
+    //int karty[7];
     karty[0] = clients[cislo]->prvaKarta;
     karty[1] = clients[cislo]->druhaKarta;
     karty[2] = data->prvaKarta;
@@ -420,7 +420,7 @@ int fullHouse(dataHry* data, int cislo) {
     int zmena = 1;
     while (zmena > 0) {
         zmena = 0;
-        for (int i = 0; i < 7; ++i) {
+        for (int i = 0; i < 6; ++i) {
             if (karty[i] > karty[i+1]) {
                 int a = karty[i];
                 karty[i] = karty[i+1];
@@ -431,7 +431,7 @@ int fullHouse(dataHry* data, int cislo) {
     }
     int pocetRovnakych = 0;
     int cislo1 = 0;
-    for (int i = 0; i < 7; ++i) {
+    for (int i = 0; i < 6; ++i) {
         if (karty[i] == karty[i+1]) {
             pocetRovnakych++;
             cislo1 = karty[i];
@@ -439,9 +439,9 @@ int fullHouse(dataHry* data, int cislo) {
             pocetRovnakych = 0;
         }
         if (pocetRovnakych == 2) {
-            clients[i]->najvyssia = karty[i];
-            for (int j = 0; j < 7; ++j) {
-                if (karty[i] == karty[i+1] && cislo1 != karty[i]) {
+            //clients[i]->najvyssia = karty[i];
+            for (int j = 0; j < 6; ++j) {
+                if (karty[j] == karty[j+1] && cislo1 != karty[j]) {
                     return 1;
                 }
             }
@@ -451,8 +451,8 @@ int fullHouse(dataHry* data, int cislo) {
 }
 
 int flush(dataHry* data, int cislo) {
-    int faraby[7];
-    int karty[7];
+    //int faraby[7];
+    //int karty[7];
     karty[0] = clients[cislo]->prvaKarta;
     karty[1] = clients[cislo]->druhaKarta;
     karty[2] = data->prvaKarta;
@@ -470,7 +470,7 @@ int flush(dataHry* data, int cislo) {
     int zmena = 1;
     while (zmena > 0) {
         zmena = 0;
-        for (int i = 0; i < 7; ++i) {
+        for (int i = 0; i < 6; ++i) {
             if (faraby[i] > faraby[i+1]) {
                 int a = faraby[i];
                 faraby[i] = faraby[i+1];
@@ -480,14 +480,14 @@ int flush(dataHry* data, int cislo) {
         }
     }
     int pocetRovnakych = 0;
-    for (int i = 0; i < 7; ++i) {
+    for (int i = 0; i < 6; ++i) {
         if (faraby[i] == faraby[i+1]) {
             pocetRovnakych++;
         } else {
             pocetRovnakych = 0;
         }
-        if (pocetRovnakych == 3) {
-            clients[i]->najvyssia = karty[i];
+        if (pocetRovnakych == 4) {
+            //clients[i]->najvyssia = karty[i];
             return 1;
         }
     }
@@ -495,7 +495,7 @@ int flush(dataHry* data, int cislo) {
 }
 
 int straight(dataHry* data, int cislo) {
-    int karty[7];
+    //int karty[7];
     karty[0] = clients[cislo]->prvaKarta;
     karty[1] = clients[cislo]->druhaKarta;
     karty[2] = data->prvaKarta;
@@ -506,7 +506,7 @@ int straight(dataHry* data, int cislo) {
     int zmena = 1;
     while (zmena > 0) {
         zmena = 0;
-        for (int i = 0; i < 7; ++i) {
+        for (int i = 0; i < 6; ++i) {
             if (karty[i] > karty[i+1]) {
                 int a = karty[i];
                 karty[i] = karty[i+1];
@@ -516,7 +516,7 @@ int straight(dataHry* data, int cislo) {
         }
     }
     int postupka = 0;
-    for (int i = 0; i < 7; ++i) {
+    for (int i = 0; i < 6; ++i) {
         if (karty[i] == karty[i+1] + 1) {
             postupka++;
         } else {
@@ -525,7 +525,7 @@ int straight(dataHry* data, int cislo) {
             }
         }
         if (postupka == 4) {
-            clients[i]->najvyssia = karty[i];
+            //clients[i]->najvyssia = karty[i];
             return 1;
         }
     }
@@ -533,7 +533,7 @@ int straight(dataHry* data, int cislo) {
 }
 
 int threeofAKind(dataHry* data, int cislo) {
-    int karty[7];
+    //int karty[7];
     karty[0] = clients[cislo]->prvaKarta;
     karty[1] = clients[cislo]->druhaKarta;
     karty[2] = data->prvaKarta;
@@ -544,7 +544,7 @@ int threeofAKind(dataHry* data, int cislo) {
     int zmena = 1;
     while (zmena > 0) {
         zmena = 0;
-        for (int i = 0; i < 7; ++i) {
+        for (int i = 0; i < 6; ++i) {
             if (karty[i] > karty[i+1]) {
                 int a = karty[i];
                 karty[i] = karty[i+1];
@@ -554,14 +554,14 @@ int threeofAKind(dataHry* data, int cislo) {
         }
     }
     int pocetRovnakych = 0;
-    for (int i = 0; i < 7; ++i) {
+    for (int i = 0; i < 6; ++i) {
         if (karty[i] == karty[i+1]) {
             pocetRovnakych++;
         } else {
             pocetRovnakych = 0;
         }
         if (pocetRovnakych == 2) {
-            clients[i]->najvyssia = karty[i];
+            //clients[i]->najvyssia = karty[i];
             return 1;
         }
     }
@@ -569,7 +569,7 @@ int threeofAKind(dataHry* data, int cislo) {
 }
 
 int twoPairs(dataHry* data, int cislo) {
-    int karty[7];
+    //int karty[7];
     karty[0] = clients[cislo]->prvaKarta;
     karty[1] = clients[cislo]->druhaKarta;
     karty[2] = data->prvaKarta;
@@ -580,7 +580,7 @@ int twoPairs(dataHry* data, int cislo) {
     int zmena = 1;
     while (zmena > 0) {
         zmena = 0;
-        for (int i = 0; i < 7; ++i) {
+        for (int i = 0; i < 6; ++i) {
             if (karty[i] > karty[i+1]) {
                 int a = karty[i];
                 karty[i] = karty[i+1];
@@ -590,15 +590,15 @@ int twoPairs(dataHry* data, int cislo) {
         }
     }
     int cislo1 = 0;
-    for (int i = 0; i < 7; ++i) {
+    for (int i = 0; i < 6; ++i) {
         if (karty[i] == karty[i+1]) {
-            clients[i]->najvyssia = karty[i];
+            //clients[i]->najvyssia = karty[i];
             cislo1 = karty[i];
-            for (int j = 0; j < 7; ++j) {
-                if (karty[i] == karty[i + 1] && cislo1 != karty[i]) {
-                    if (clients[i]->najvyssia < karty[i]) {
-                        clients[i]->najvyssia = karty[i];
-                    }
+            for (int j = 0; j < 6; ++j) {
+                if (karty[j] == karty[j + 1] && cislo1 != karty[j]) {
+                    //if (clients[i]->najvyssia < karty[i]) {
+                        //clients[i]->najvyssia = karty[i];
+                    //}
                     return 1;
                 }
             }
@@ -608,7 +608,6 @@ int twoPairs(dataHry* data, int cislo) {
 }
 
 int onePair(dataHry* data, int cislo) {
-    int karty[7];
     karty[0] = clients[cislo]->prvaKarta;
     karty[1] = clients[cislo]->druhaKarta;
     karty[2] = data->prvaKarta;
@@ -619,7 +618,7 @@ int onePair(dataHry* data, int cislo) {
     int zmena = 1;
     while (zmena > 0) {
         zmena = 0;
-        for (int i = 0; i < 7; ++i) {
+        for (int i = 0; i < 6; ++i) {
             if (karty[i] > karty[i+1]) {
                 int a = karty[i];
                 karty[i] = karty[i+1];
@@ -628,9 +627,9 @@ int onePair(dataHry* data, int cislo) {
             }
         }
     }
-    for (int i = 0; i < 7; ++i) {
+    for (int i = 0; i < 6; ++i) {
         if (karty[i] == karty[i+1]) {
-            clients[i]->najvyssia = karty[i];
+            //clients[i]->najvyssia = karty[i];
             return 1;
         }
     }
@@ -641,8 +640,7 @@ void vyhodnotVysledky(dataHry* data) {
     char buff_out[2048];
     int body[cli_count];
     int vitazi[cli_count];
-    int cislo = 0;
-    dataHry *dataH = (dataHry *)data;
+    //dataHry *dataH = (dataHry *)data;
     int pocetVitazov = 0;
     for (int i = 0; i < cli_count; ++i) {
         if (clients[i]->meniliSme == 2) {
@@ -653,50 +651,74 @@ void vyhodnotVysledky(dataHry* data) {
             sprintf(buff_out, "Hrac %s ma karty %d,f%d a %d, %d\n", clients[i]->name, clients[i]->prvaKarta, clients[i]->prvaFarba, clients[i]->druhaKarta, clients[i]->druhaFarba);
             send_messageToAll(buff_out);
             printf("Dosli sme sem3\n");
-            cislo = straightFlash(dataH, i);
+            //number = straightFlash(dataH, i);
             printf("Dosli sme sem4\n");
-            if (cislo == 1) {
+            dataHry *dataH = (dataHry *)data;
+            int f = i;
+            if ((int)straightFlash(dataH, f) == 1) {
+            //if (2 == 1) {
                 printf("Dosli sme sem5\n");
                 sprintf(buff_out, "Hrac %s ma cistu postupku\n", clients[i]->name);
                 send_messageToAll(buff_out);
                 body[i] = 8;
             } else {
-                printf("Disli sme sem5");
-                if ((int)fourofAKind(data, i) == 1) {
+                printf("Disli sme sem5\n");
+                if ((int) fourofAKind(dataH, f) == 1) {
+                //if (2 == 1) {
+                    printf("Disli sme sem61\n");
                     sprintf(buff_out, "Hrac %s ma styri rovnake karty\n", clients[i]->name);
                     send_messageToAll(buff_out);
                     body[i] = 7;
                 } else {
-                    if ((int)fullHouse(data, i) == 1) {
+                    printf("Disli sme sem62\n");
+                    if ((int) fullHouse(dataH, f) == 1) {
+                    //if (2 == 1) {
+                        printf("Disli sme sem71\n");
                         sprintf(buff_out, "Hrac %s ma full house\n", clients[i]->name);
                         send_messageToAll(buff_out);
                         body[i] = 6;
                     } else {
-                        if ((int)flush(data, i) == 1) {
+                        printf("Disli sme sem72\n");
+                        if ((int) flush(dataH, f) == 1) {
+                        //if (2 == 1) {
+                            printf("Disli sme sem81\n");
                             sprintf(buff_out, "Hrac %s ma flush (5 s rovnakou farbou)\n", clients[i]->name);
                             send_messageToAll(buff_out);
                             body[i] = 5;
                         } else {
-                            if ((int)straight(data, i) == 1) {
+                            printf("Disli sme sem82\n");
+                            if ((int) straight(dataH, f) == 1) {
+                            //if (2 == 1) {
+                                printf("Disli sme sem91\n");
                                 sprintf(buff_out, "Hrac %s ma straight (postupku bez farby)\n", clients[i]->name);
                                 send_messageToAll(buff_out);
                                 body[i] = 4;
                             } else {
-                                if ((int)threeofAKind(data, i) == 1) {
+                                printf("Disli sme sem92\n");
+                                if ((int) threeofAKind(dataH, f) == 1) {
+                                //if (2 == 1) {
+                                    printf("Disli sme sem101\n");
                                     sprintf(buff_out, "Hrac %s ma tri rovnake\n", clients[i]->name);
                                     send_messageToAll(buff_out);
                                     body[i] = 3;
                                 } else {
-                                    if ((int)twoPairs(data, i) == 1) {
+                                    printf("Disli sme sem102\n");
+                                    if ((int) twoPairs(dataH, f) == 1) {
+                                    //if (2 == 1) {
+                                        printf("Disli sme sem111\n");
                                         sprintf(buff_out, "Hrac %s ma dva pary\n", clients[i]->name);
                                         send_messageToAll(buff_out);
                                         body[i] = 2;
                                     } else {
-                                        if ((int)onePair(data, i) == 1) {
+                                        printf("Disli sme sem112\n");
+                                        if ((int) onePair(dataH, f) == 1) {
+                                        //if (2 == 1) {
+                                            printf("Disli sme sem121\n");
                                             sprintf(buff_out, "Hrac %s ma par\n", clients[i]->name);
                                             send_messageToAll(buff_out);
                                             body[i] = 1;
                                         } else {
+                                            printf("Disli sme sem122\n");
                                             body[i] = 0;
                                             if (clients[i]->prvaKarta > clients[i]->druhaKarta) {
                                                 clients[i]->najvyssia = clients[i]->prvaKarta;
@@ -706,6 +728,7 @@ void vyhodnotVysledky(dataHry* data) {
                                             sprintf(buff_out, "Hrac %s ma najvyssiu kartu %d\n", clients[i]->name, clients[i]->najvyssia);
                                             send_messageToAll(buff_out);
                                         }
+
                                     }
                                 }
                             }
@@ -715,32 +738,33 @@ void vyhodnotVysledky(dataHry* data) {
             }
         }
     }
-    printf("Dosli sme na koniec");
+    printf("Dosli sme na koniec\n");
     int najvyssie = -1;
     for (int i = 0; i < cli_count; ++i) {
         if (body[i] > najvyssie) {
             najvyssie = body[i];
             vitazi[0] = i;
-            pocetVitazov = 1;
+            pocetVitazov = 0;
         }
         if (body[i] == najvyssie) {
-            if (clients[body[i]]->najvyssia < clients[i]->najvyssia) {
-                vitazi[0] = i;
-                pocetVitazov = 1;
-            } else {
+            //if (clients[body[i]]->najvyssia < clients[i]->najvyssia) {
+                vitazi[pocetVitazov] = i;
+                pocetVitazov += 1;
+            /*} else {
                 if (clients[body[i]]->najvyssia == clients[i]->najvyssia) {
                     vitazi[pocetVitazov] = i;
                     pocetVitazov++;
                 }
-            }
+            }*/
         }
     }
-    printf("Dosli sme na koniec2");
+    printf("Dosli sme na koniec2\n");
     for (int i = 0; i < pocetVitazov; ++i) {
         clients[vitazi[i]]->pocetZetonov += (*data->celkovaStavka / pocetVitazov);
-        sprintf(buff_out, "Vyhral hrac %s\n", clients[i]->name);
+        sprintf(buff_out, "Vyhral hrac %s\n", clients[vitazi[i]]->name);
         send_messageToAll(buff_out);
     }
+    printf("Dosli sme na koniec3\n");
 }
 
 void * hlavny_program(void * data) {
@@ -912,7 +936,7 @@ void * hlavny_program(void * data) {
                 dataH->stvrtaFarba = (rand() % 4) + 1;
                 kontrilaOriginality += kontrola(dataH, dataH->stvrtaKarta, dataH->stvrtaFarba);
             }
-            sprintf(buff_out, "Stvrta karta je %d,f%d", dataH->stvrtaKarta, dataH->stvrtaFarba);
+            sprintf(buff_out, "Stvrta karta je %d,f%d\n", dataH->stvrtaKarta, dataH->stvrtaFarba);
             send_messageToAll(buff_out);
 
             mameStavene = 0;
@@ -955,7 +979,7 @@ void * hlavny_program(void * data) {
                 dataH->piataFarba = (rand() % 4) + 1;
                 kontrilaOriginality += kontrola(dataH, dataH->piataKarta, dataH->piataFarba);
             }
-            sprintf(buff_out, "Piata karta je %d,f%d", dataH->piataKarta, dataH->piataFarba);
+            sprintf(buff_out, "Piata karta je %d,f%d\n", dataH->piataKarta, dataH->piataFarba);
             send_messageToAll(buff_out);
 
             mameStavene = 0;
@@ -967,7 +991,7 @@ void * hlavny_program(void * data) {
                 for (int i = 0; i < cli_count; ++i) {
                     if (clients[i]) {
                         if (clients[i]->meniliSme == 0) {
-                            sprintf(buff_out, "Vas pocet zetonov je %d\n Celkovo je v hre %d\n Potrebna stavka je %d\n Vasa stavka je %d\n Vase karty su %d,f%d a %d,f%d\n Spolocne karty su %d,f%d a %d,f%d a %d,f%d a %d,f%d a %d,f%d\n Stlac 0 pre check/dorovnanie, kladne cislo pre zvysenie stavky, zaporne pre zlozenie\n", clients[i]->pocetZetonov, *clients[i]->celkovaStavka, *clients[i]->potrebnaStavka, clients[i]->klientovaStavka, clients[i]->prvaKarta, clients[i]->prvaFarba, clients[i]->druhaKarta, clients[i]->druhaFarba, dataH->prvaKarta, dataH->prvaFarba, dataH->druhaKarta, dataH->druhaFarba, dataH->tretiaKarta, dataH->tretiaFarba, dataH->stvrtaKarta, dataH->stvrtaFarba, dataH->prvaKarta, dataH->prvaFarba);
+                            sprintf(buff_out, "Vas pocet zetonov je %d\n Celkovo je v hre %d\n Potrebna stavka je %d\n Vasa stavka je %d\n Vase karty su %d,f%d a %d,f%d\n Spolocne karty su %d,f%d a %d,f%d a %d,f%d a %d,f%d a %d,f%d\n Stlac 0 pre check/dorovnanie, kladne cislo pre zvysenie stavky, zaporne pre zlozenie\n", clients[i]->pocetZetonov, *clients[i]->celkovaStavka, *clients[i]->potrebnaStavka, clients[i]->klientovaStavka, clients[i]->prvaKarta, clients[i]->prvaFarba, clients[i]->druhaKarta, clients[i]->druhaFarba, dataH->prvaKarta, dataH->prvaFarba, dataH->druhaKarta, dataH->druhaFarba, dataH->tretiaKarta, dataH->tretiaFarba, dataH->stvrtaKarta, dataH->stvrtaFarba, dataH->piataKarta, dataH->piataFarba);
                             send_messageToConcrete(buff_out, clients[i]->uid);
                             pthread_cond_wait(&cakameNaKlienta, &clients_mutex);
                             if (clients[i]->meniliSme == 1) {
@@ -1013,6 +1037,7 @@ void * hlavny_program(void * data) {
                 vyhodnotVysledky(dataH);
             }
 
+            printf("Dosli sme na koniec4\n");
             dataH->bigBlind += 1;
             dataH->smallBlind += 1;
             if (dataH->bigBlind >= cli_count) {
@@ -1023,6 +1048,7 @@ void * hlavny_program(void * data) {
             }
             *dataH->celkovaStavka = 0;
             *dataH->potrebnaStavka = 0;
+            printf("Dosli sme na koniec5\n");
             for (int i = 0; i < cli_count; ++i) {
                 if (clients[i]) {
                     clients[i]->klientovaStavka = 0;
@@ -1031,12 +1057,13 @@ void * hlavny_program(void * data) {
                     clients[i]->druhaKarta = 0;
                 }
             }
+            printf("Dosli sme na koniec6\n");
             dataH->prvaKarta = 0;
             dataH->druhaKarta = 0;
             dataH->tretiaKarta = 0;
             dataH->stvrtaKarta = 0;
             dataH->piataKarta = 0;
-
+            printf("Dosli sme na koniec7\n");
             zlozilPosledny = 0;
             vitaz = 0;
             druha = 0;
