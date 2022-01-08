@@ -30,6 +30,7 @@ typedef struct {
     int* potrebnaStavka;
     int meniliSme;
     int najvyssia;
+    int skoncil;
     //pthread_mutex_t* mutex;
     //pthread_cond_t *cakamenaKlienta;
 } client_t;
@@ -63,21 +64,6 @@ int cli_count = 0;
 int koniecHry = 0;
 int karty[7];
 int faraby[7] = {0};
-
-void str_overwrite_stdout() {
-    printf("\r%s", "> ");
-    fflush(stdout);
-}
-
-void str_trim_lf (char* arr, int length) {
-    int i;
-    for (i = 0; i < length; i++) { // trim \n
-        if (arr[i] == '\n') {
-            arr[i] = '\0';
-            break;
-        }
-    }
-}
 
 //pridanie klienta do hry
 void queue_add(client_t *cl){
@@ -175,21 +161,41 @@ void klientovaAkcia(char buff_out[2048], client_t* cli) {
             sprintf(buff_out, "Hrac %s checkuje\n", cli->name);
             send_messageToAll(buff_out);
         } else {
-            sprintf(buff_out, "Hrac %s dorovnava\n", cli->name);
-            send_messageToAll(buff_out);
-            cli->pocetZetonov -= *cli->potrebnaStavka - cli->klientovaStavka;
-            *cli->celkovaStavka += *cli->potrebnaStavka - cli->klientovaStavka;
-            cli->klientovaStavka = *cli->potrebnaStavka;
+            if (*cli->potrebnaStavka - cli->klientovaStavka < cli->pocetZetonov) {
+                sprintf(buff_out, "Hrac %s dorovnava\n", cli->name);
+                send_messageToAll(buff_out);
+                cli->pocetZetonov -= *cli->potrebnaStavka - cli->klientovaStavka;
+                *cli->celkovaStavka += *cli->potrebnaStavka - cli->klientovaStavka;
+                cli->klientovaStavka = *cli->potrebnaStavka;
+            } else {
+                sprintf(buff_out, "Hrac %s dava all in\n", cli->name);
+                send_messageToAll(buff_out);
+                *cli->celkovaStavka += cli->pocetZetonov;
+                cli->klientovaStavka += cli->pocetZetonov;
+                cli->pocetZetonov = 0;
+            }
         }
     } else {
         if (cislo > 0) {
-            *cli->celkovaStavka += cislo + (*cli->potrebnaStavka - cli->klientovaStavka);
-            cli->pocetZetonov -= cislo + (*cli->potrebnaStavka - cli->klientovaStavka);
-            cli->klientovaStavka += cislo + (*cli->potrebnaStavka - cli->klientovaStavka);
-            *cli->potrebnaStavka = cli->klientovaStavka;
-            cli->meniliSme = 1;
-            sprintf(buff_out, "Hrac %s navysil stavku o %d\n", cli->name, cislo);
-            send_messageToAll(buff_out);
+            if (cislo + (*cli->potrebnaStavka - cli->klientovaStavka) < cli->pocetZetonov) {
+                *cli->celkovaStavka += cislo + (*cli->potrebnaStavka - cli->klientovaStavka);
+                cli->pocetZetonov -= cislo + (*cli->potrebnaStavka - cli->klientovaStavka);
+                cli->klientovaStavka += cislo + (*cli->potrebnaStavka - cli->klientovaStavka);
+                *cli->potrebnaStavka = cli->klientovaStavka;
+                cli->meniliSme = 1;
+                sprintf(buff_out, "Hrac %s navysil stavku o %d\n", cli->name, cislo);
+                send_messageToAll(buff_out);
+            } else {
+                *cli->celkovaStavka += cli->pocetZetonov;
+                cli->klientovaStavka += cli->pocetZetonov;
+                if (*cli->potrebnaStavka < cli->klientovaStavka) {
+                    *cli->potrebnaStavka = cli->klientovaStavka;
+                }
+                cli->pocetZetonov = 0;
+                cli->meniliSme = 1;
+                sprintf(buff_out, "Hrac %s dava all in\n", cli->name);
+                send_messageToAll(buff_out);
+            }
         } else {
             cli->meniliSme = 2;
             sprintf(buff_out, "Hrac %s zlozil karty o %d\n", cli->name, cislo);
@@ -230,13 +236,36 @@ void * handle_client(void * data) {
             break;
         }
 
+        //ak uz nema zetony, skoncil
+        /*if (cli->skoncil > 0) {
+            sprintf(buff_out, "");
+            send_messageToConcrete(buff_out, cli->uid);
+            //write(cli->sockfd, "exit", 0);
+            leave_flag = 1;
+            //receive = 0;
+            //break;
+        }*/
+
         //cakame, kym klient nieco vykona
         int receive = recv(cli->sockfd, buff_out, 2048, 0);
+
+        if (cli_count <= 1) {
+            sprintf(buff_out, "HURA VYHRALI STE\n");
+            send_messageToConcrete(buff_out, cli->uid);
+            sprintf(buff_out, "exit\n");
+            send_messageToConcrete(buff_out, cli->uid);
+            //write(cli->sockfd, "exit", 0);
+            leave_flag = 1;
+            receive = 0;
+            koniecHry = 1;
+            //break;
+        }
+
         if (receive > 0){
             //ak nieco dostaneme
             if(strlen(buff_out) > 0){
                 send_message(buff_out, cli->uid);                          //posleme vsetkym klientom spravu, normalka
-                str_trim_lf(buff_out, strlen(buff_out));
+                //str_trim_lf(buff_out, strlen(buff_out));
                 printf("%s -> %s\n", buff_out, cli->name);          //posleme spravu, ktoru poslal dany klient
                 klientovaAkcia(buff_out, cli);
                 pthread_cond_signal(&cakameNaKlienta);
@@ -269,9 +298,11 @@ void * handle_client(void * data) {
 int kontrola(dataHry* data, int cislo, int farba) {
     int pocetRovnakych = 0;
     for (int i = 0; i < cli_count; ++i) {
-        if (cislo == clients[i]->prvaKarta) {
-            if (farba == clients[i]->prvaFarba) {
-                pocetRovnakych++;
+        if (clients[i]) {
+            if (cislo == clients[i]->prvaKarta) {
+                if (farba == clients[i]->prvaFarba) {
+                    pocetRovnakych++;
+                }
             }
         }
         if (cislo == clients[i]->druhaKarta) {
@@ -643,92 +674,96 @@ void vyhodnotVysledky(dataHry* data) {
     //dataHry *dataH = (dataHry *)data;
     int pocetVitazov = 0;
     for (int i = 0; i < cli_count; ++i) {
-        if (clients[i]->meniliSme == 2) {
-            sprintf(buff_out, "Hrac %s zlozil karty\n", clients[i]->name);
-            send_messageToAll(buff_out);
-            body[i] = -1;
-        } else {
-            sprintf(buff_out, "Hrac %s ma karty %d,f%d a %d, %d\n", clients[i]->name, clients[i]->prvaKarta, clients[i]->prvaFarba, clients[i]->druhaKarta, clients[i]->druhaFarba);
-            send_messageToAll(buff_out);
-            printf("Dosli sme sem3\n");
-            //number = straightFlash(dataH, i);
-            printf("Dosli sme sem4\n");
-            dataHry *dataH = (dataHry *)data;
-            int f = i;
-            if ((int)straightFlash(dataH, f) == 1) {
-            //if (2 == 1) {
-                printf("Dosli sme sem5\n");
-                sprintf(buff_out, "Hrac %s ma cistu postupku\n", clients[i]->name);
+        if (clients[i]) {
+            if (clients[i]->meniliSme == 2) {
+                sprintf(buff_out, "Hrac %s zlozil karty\n", clients[i]->name);
                 send_messageToAll(buff_out);
-                body[i] = 8;
+                body[i] = -1;
             } else {
-                printf("Disli sme sem5\n");
-                if ((int) fourofAKind(dataH, f) == 1) {
-                //if (2 == 1) {
-                    printf("Disli sme sem61\n");
-                    sprintf(buff_out, "Hrac %s ma styri rovnake karty\n", clients[i]->name);
-                    send_messageToAll(buff_out);
-                    body[i] = 7;
-                } else {
-                    printf("Disli sme sem62\n");
-                    if ((int) fullHouse(dataH, f) == 1) {
+                sprintf(buff_out, "Hrac %s ma karty %d,f%d a %d, %d\n", clients[i]->name, clients[i]->prvaKarta,
+                        clients[i]->prvaFarba, clients[i]->druhaKarta, clients[i]->druhaFarba);
+                send_messageToAll(buff_out);
+                printf("Dosli sme sem3\n");
+                //number = straightFlash(dataH, i);
+                printf("Dosli sme sem4\n");
+                dataHry *dataH = (dataHry *) data;
+                int f = i;
+                if ((int) straightFlash(dataH, f) == 1) {
                     //if (2 == 1) {
-                        printf("Disli sme sem71\n");
-                        sprintf(buff_out, "Hrac %s ma full house\n", clients[i]->name);
-                        send_messageToAll(buff_out);
-                        body[i] = 6;
-                    } else {
-                        printf("Disli sme sem72\n");
-                        if ((int) flush(dataH, f) == 1) {
+                    printf("Dosli sme sem5\n");
+                    sprintf(buff_out, "Hrac %s ma cistu postupku\n", clients[i]->name);
+                    send_messageToAll(buff_out);
+                    body[i] = 8;
+                } else {
+                    printf("Disli sme sem5\n");
+                    if ((int) fourofAKind(dataH, f) == 1) {
                         //if (2 == 1) {
-                            printf("Disli sme sem81\n");
-                            sprintf(buff_out, "Hrac %s ma flush (5 s rovnakou farbou)\n", clients[i]->name);
-                            send_messageToAll(buff_out);
-                            body[i] = 5;
-                        } else {
-                            printf("Disli sme sem82\n");
-                            if ((int) straight(dataH, f) == 1) {
+                        printf("Disli sme sem61\n");
+                        sprintf(buff_out, "Hrac %s ma styri rovnake karty\n", clients[i]->name);
+                        send_messageToAll(buff_out);
+                        body[i] = 7;
+                    } else {
+                        printf("Disli sme sem62\n");
+                        if ((int) fullHouse(dataH, f) == 1) {
                             //if (2 == 1) {
-                                printf("Disli sme sem91\n");
-                                sprintf(buff_out, "Hrac %s ma straight (postupku bez farby)\n", clients[i]->name);
-                                send_messageToAll(buff_out);
-                                body[i] = 4;
-                            } else {
-                                printf("Disli sme sem92\n");
-                                if ((int) threeofAKind(dataH, f) == 1) {
+                            printf("Disli sme sem71\n");
+                            sprintf(buff_out, "Hrac %s ma full house\n", clients[i]->name);
+                            send_messageToAll(buff_out);
+                            body[i] = 6;
+                        } else {
+                            printf("Disli sme sem72\n");
+                            if ((int) flush(dataH, f) == 1) {
                                 //if (2 == 1) {
-                                    printf("Disli sme sem101\n");
-                                    sprintf(buff_out, "Hrac %s ma tri rovnake\n", clients[i]->name);
-                                    send_messageToAll(buff_out);
-                                    body[i] = 3;
-                                } else {
-                                    printf("Disli sme sem102\n");
-                                    if ((int) twoPairs(dataH, f) == 1) {
+                                printf("Disli sme sem81\n");
+                                sprintf(buff_out, "Hrac %s ma flush (5 s rovnakou farbou)\n", clients[i]->name);
+                                send_messageToAll(buff_out);
+                                body[i] = 5;
+                            } else {
+                                printf("Disli sme sem82\n");
+                                if ((int) straight(dataH, f) == 1) {
                                     //if (2 == 1) {
-                                        printf("Disli sme sem111\n");
-                                        sprintf(buff_out, "Hrac %s ma dva pary\n", clients[i]->name);
-                                        send_messageToAll(buff_out);
-                                        body[i] = 2;
-                                    } else {
-                                        printf("Disli sme sem112\n");
-                                        if ((int) onePair(dataH, f) == 1) {
+                                    printf("Disli sme sem91\n");
+                                    sprintf(buff_out, "Hrac %s ma straight (postupku bez farby)\n", clients[i]->name);
+                                    send_messageToAll(buff_out);
+                                    body[i] = 4;
+                                } else {
+                                    printf("Disli sme sem92\n");
+                                    if ((int) threeofAKind(dataH, f) == 1) {
                                         //if (2 == 1) {
-                                            printf("Disli sme sem121\n");
-                                            sprintf(buff_out, "Hrac %s ma par\n", clients[i]->name);
+                                        printf("Disli sme sem101\n");
+                                        sprintf(buff_out, "Hrac %s ma tri rovnake\n", clients[i]->name);
+                                        send_messageToAll(buff_out);
+                                        body[i] = 3;
+                                    } else {
+                                        printf("Disli sme sem102\n");
+                                        if ((int) twoPairs(dataH, f) == 1) {
+                                            //if (2 == 1) {
+                                            printf("Disli sme sem111\n");
+                                            sprintf(buff_out, "Hrac %s ma dva pary\n", clients[i]->name);
                                             send_messageToAll(buff_out);
-                                            body[i] = 1;
+                                            body[i] = 2;
                                         } else {
-                                            printf("Disli sme sem122\n");
-                                            body[i] = 0;
-                                            if (clients[i]->prvaKarta > clients[i]->druhaKarta) {
-                                                clients[i]->najvyssia = clients[i]->prvaKarta;
+                                            printf("Disli sme sem112\n");
+                                            if ((int) onePair(dataH, f) == 1) {
+                                                //if (2 == 1) {
+                                                printf("Disli sme sem121\n");
+                                                sprintf(buff_out, "Hrac %s ma par\n", clients[i]->name);
+                                                send_messageToAll(buff_out);
+                                                body[i] = 1;
                                             } else {
-                                                clients[i]->najvyssia = clients[i]->druhaKarta;
+                                                printf("Disli sme sem122\n");
+                                                body[i] = 0;
+                                                if (clients[i]->prvaKarta > clients[i]->druhaKarta) {
+                                                    clients[i]->najvyssia = clients[i]->prvaKarta;
+                                                } else {
+                                                    clients[i]->najvyssia = clients[i]->druhaKarta;
+                                                }
+                                                sprintf(buff_out, "Hrac %s ma najvyssiu kartu %d\n", clients[i]->name,
+                                                        clients[i]->najvyssia);
+                                                send_messageToAll(buff_out);
                                             }
-                                            sprintf(buff_out, "Hrac %s ma najvyssiu kartu %d\n", clients[i]->name, clients[i]->najvyssia);
-                                            send_messageToAll(buff_out);
-                                        }
 
+                                        }
                                     }
                                 }
                             }
@@ -741,28 +776,40 @@ void vyhodnotVysledky(dataHry* data) {
     printf("Dosli sme na koniec\n");
     int najvyssie = -1;
     for (int i = 0; i < cli_count; ++i) {
-        if (body[i] > najvyssie) {
-            najvyssie = body[i];
-            vitazi[0] = i;
-            pocetVitazov = 0;
-        }
-        if (body[i] == najvyssie) {
-            //if (clients[body[i]]->najvyssia < clients[i]->najvyssia) {
+        if (clients[i]) {
+            if (body[i] > najvyssie) {
+                najvyssie = body[i];
+                vitazi[0] = i;
+                pocetVitazov = 0;
+            }
+            if (body[i] == najvyssie) {
                 vitazi[pocetVitazov] = i;
                 pocetVitazov += 1;
-            /*} else {
-                if (clients[body[i]]->najvyssia == clients[i]->najvyssia) {
-                    vitazi[pocetVitazov] = i;
-                    pocetVitazov++;
-                }
-            }*/
+            }
         }
     }
     printf("Dosli sme na koniec2\n");
     for (int i = 0; i < pocetVitazov; ++i) {
-        clients[vitazi[i]]->pocetZetonov += (*data->celkovaStavka / pocetVitazov);
-        sprintf(buff_out, "Vyhral hrac %s\n", clients[vitazi[i]]->name);
-        send_messageToAll(buff_out);
+        if (clients[i]) {
+            clients[vitazi[i]]->pocetZetonov += (*data->celkovaStavka / pocetVitazov);
+            sprintf(buff_out, "Vyhral hrac %s\n", clients[vitazi[i]]->name);
+            send_messageToAll(buff_out);
+        }
+    }
+    //ak uz nema zetony, skoncil
+    for (int i = 0; i < cli_count; ++i) {
+        if (clients[i]) {
+            if (clients[i]->pocetZetonov <= 0) {
+                sprintf(buff_out, "Klient %s ma nula zetonov, skoncil\n", clients[i]->name);
+                send_messageToAll(buff_out);
+                sprintf(buff_out, "Napiste rozluckovu vetu\n");
+                send_messageToConcrete(buff_out, clients[i]->uid);
+                pthread_cond_wait(&cakameNaKlienta, &clients_mutex);
+                sprintf(buff_out, "exit");
+                send_messageToConcrete(buff_out, clients[i]->uid);
+                clients[i]->skoncil = 1;
+            }
+        }
     }
     printf("Dosli sme na koniec3\n");
 }
@@ -1015,21 +1062,25 @@ void * hlavny_program(void * data) {
             send_messageToAll(buff_out);
             if (pocetHrajucich == 1) {
                 for (int i = 0; i < cli_count; ++i) {
-                    if (clients[i]->meniliSme == 0) {
-                        sprintf(buff_out, "VITAZOM KOLA JE %s\n", clients[i]->name);
-                        send_messageToAll(buff_out);
-                        clients[i]->pocetZetonov += *dataH->celkovaStavka;
-                        break;
+                    if (clients[i]) {
+                        if (clients[i]->meniliSme == 0) {
+                            sprintf(buff_out, "VITAZOM KOLA JE %s\n", clients[i]->name);
+                            send_messageToAll(buff_out);
+                            clients[i]->pocetZetonov += *dataH->celkovaStavka;
+                            break;
+                        }
                     }
                 }
             }
             if (pocetHrajucich == 0) {
                 for (int i = 0; i < cli_count; ++i) {
-                    if (clients[i]->uid == zlozilPosledny) {
-                        sprintf(buff_out, "VITAZOM KOLA JE %s\n", clients[i]->name);
-                        send_messageToAll(buff_out);
-                        clients[i]->pocetZetonov += *dataH->celkovaStavka;
-                        break;
+                    if (clients[i]) {
+                        if (clients[i]->uid == zlozilPosledny) {
+                            sprintf(buff_out, "VITAZOM KOLA JE %s\n", clients[i]->name);
+                            send_messageToAll(buff_out);
+                            clients[i]->pocetZetonov += *dataH->celkovaStavka;
+                            break;
+                        }
                     }
                 }
             }
@@ -1161,8 +1212,7 @@ int main() {
         cli->druhaFarba = 0;
         cli->meniliSme = 0;
         cli->najvyssia = 0;
-        //cli->mutex = &clients_mutex;
-        //cli->cakamenaKlienta = &cakameNaKlienta;
+        cli->skoncil = 0;
 
         //pridame klienta do hry
         queue_add(cli);

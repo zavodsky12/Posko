@@ -32,7 +32,7 @@ void str_trim_lf (char* arr, int length) {
     }
 }
 
-void catch_ctrl_c_and_exit(int sig) {
+void exit_program(int sig) {
     flag = 1;
 }
 
@@ -58,7 +58,7 @@ void send_msg_handler() {
         bzero(message, 2048);
         bzero(buffer, 2048 + 32);
     }
-    catch_ctrl_c_and_exit(2);
+    exit_program(2);
 }
 
 //toto vlakno manazuje prijimanie sprav od servera
@@ -67,16 +67,21 @@ void recv_msg_handler() {
     while (1) {
         //caka na spravu od servera
         int receive = recv(sockFD, message, 2048, 0);
+        if ((char)message[0] == 'e') {
+            break;
+        }
         if (receive > 0) {
+            printf("%c", (char)message[0]);
             printf("%s", message);
             str_overwrite_stdout();
         } else if (receive == 0) {
             break;
         } else {
-            // -1
+            break;
         }
         memset(message, 0, sizeof(message));
     }
+    exit_program(2);
 }
 
 int main() {
@@ -84,7 +89,7 @@ int main() {
     char* ip = "127.0.0.1";
     int port = 9004;                 //port, na ktory sa pripajame
 
-    signal(SIGINT, catch_ctrl_c_and_exit);
+    signal(SIGINT, exit_program);
 
 
     //nastavime pouzivatelovi meno, resp sam si ho nastavi
