@@ -17,12 +17,12 @@ volatile sig_atomic_t flag = 0;
 int sockFD = 0;
 char name[32];
 
-void str_overwrite_stdout() {
+void zaciatokSpravy() {
     printf("\r%s", "> ");
     fflush(stdout);
 }
 
-void str_trim_lf (char* arr, int length) {
+void orez (char* arr, int length) {
     int i;
     for (i = 0; i < length; i++) { // trim \n
         if (arr[i] == '\n') {
@@ -32,20 +32,20 @@ void str_trim_lf (char* arr, int length) {
     }
 }
 
-void exit_program(int sig) {
+void exitProgram(int sig) {
     flag = 1;
 }
 
 //toto vlakno manazuje posielanie sprav na server
-void send_msg_handler() {
+void odosliSpravu() {
     char message[2048] = {};
     char buffer[2048 + 32] = {};
 
     while(1) {
-        str_overwrite_stdout();
+        zaciatokSpravy();
         //caka, kym pouzivatel nenapise spravu
         fgets(message, 2048, stdin);
-        str_trim_lf(message, 2048);
+        orez(message, 2048);
 
         //ak napise exit, koncime, inak posleme dalej
         if (strcmp(message, "exit") == 0) {
@@ -58,11 +58,11 @@ void send_msg_handler() {
         bzero(message, 2048);
         bzero(buffer, 2048 + 32);
     }
-    exit_program(2);
+    exitProgram(2);
 }
 
 //toto vlakno manazuje prijimanie sprav od servera
-void recv_msg_handler() {
+void prijmiSpravu() {
     char message[2048] = {};
     while (1) {
         //caka na spravu od servera
@@ -73,7 +73,7 @@ void recv_msg_handler() {
         if (receive > 0) {
             printf("%c", (char)message[0]);
             printf("%s", message);
-            str_overwrite_stdout();
+            zaciatokSpravy();
         } else if (receive == 0) {
             break;
         } else {
@@ -81,7 +81,7 @@ void recv_msg_handler() {
         }
         memset(message, 0, sizeof(message));
     }
-    exit_program(2);
+    exitProgram(2);
 }
 
 int main() {
@@ -89,13 +89,13 @@ int main() {
     char* ip = "127.0.0.1";
     int port = 9004;                 //port, na ktory sa pripajame
 
-    signal(SIGINT, exit_program);
+    signal(SIGINT, exitProgram);
 
 
     //nastavime pouzivatelovi meno, resp sam si ho nastavi
     printf("Zadajte svoje meno\n");
     fgets(name, 32, stdin);
-    str_trim_lf(name, strlen(name));
+    orez(name, strlen(name));
 
     if (strlen(name) > 32 || strlen(name) < 2){
         printf("Dlzka mena nie je validna.\n");
@@ -122,12 +122,12 @@ int main() {
 
     //dve vlakna pre poslanie spravy a obdrzanie spravy
     pthread_t send_msg_thread;
-    if(pthread_create(&send_msg_thread, NULL, (void *) send_msg_handler, NULL) != 0){
+    if(pthread_create(&send_msg_thread, NULL, (void *) odosliSpravu, NULL) != 0){
         printf("ERROR: pthread\n");
         return EXIT_FAILURE;
     }
     pthread_t recv_msg_thread;
-    if(pthread_create(&recv_msg_thread, NULL, (void *) recv_msg_handler, NULL) != 0){
+    if(pthread_create(&recv_msg_thread, NULL, (void *) prijmiSpravu, NULL) != 0){
         printf("ERROR: pthread\n");
         return EXIT_FAILURE;
     }
